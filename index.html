@@ -1,0 +1,1787 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Naija Lijnwerk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+/* Layout: werkbank — smalle bedieningskolom links, groot tekenvel rechts; op telefoon onder elkaar. */
+:root{
+  --paper:#fbfbf9; --sheet:#ffffff; --ink:#141514; --muted:#6a6e68; --rule:#dcded8;
+  --well:#f0f1ed; --accent:#0b7a46; --accent-ink:#ffffff; --warn:#a4400f;
+  --f-display:"Dela Gothic One","Arial Black",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --paper:#151715; --sheet:#1c1f1c; --ink:#eceee9; --muted:#9da29a; --rule:#323632;
+  --well:#232623; --accent:#3fbf7f; --accent-ink:#0c1a12; --warn:#f08a52; color-scheme:dark; } }
+:root[data-theme="dark"]{
+  --paper:#151715; --sheet:#1c1f1c; --ink:#eceee9; --muted:#9da29a; --rule:#323632;
+  --well:#232623; --accent:#3fbf7f; --accent-ink:#0c1a12; --warn:#f08a52; color-scheme:dark; }
+
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--paper);color:var(--ink);font:14px/1.45 var(--f-body)}
+.app{display:grid;grid-template-columns:340px 1fr;height:100%}
+.panel{overflow-y:auto;border-right:1px solid var(--rule);background:var(--paper);padding:0 18px 28px}
+.brand{position:relative;padding:20px 0 16px;margin:0 -18px 6px;padding-inline:18px;border-bottom:2px solid var(--ink)}
+.brand::after{content:"";position:absolute;right:0;top:0;bottom:0;width:120px;pointer-events:none;
+  background:radial-gradient(circle,var(--ink) 1.1px,transparent 1.4px) 0 0/7px 7px;
+  -webkit-mask:linear-gradient(90deg,transparent,#000);mask:linear-gradient(90deg,transparent,#000);opacity:.55}
+.brand h1{font:400 26px/1 var(--f-display);margin:0 0 8px;letter-spacing:.01em}
+.brand p{margin:0;color:var(--muted);max-width:30ch;font-size:13px}
+section.grp{padding:14px 0;border-bottom:1px solid var(--rule);display:grid;gap:10px}
+section.grp h2{margin:0;font:600 11px/1 var(--f-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+label.row{display:grid;grid-template-columns:96px 1fr 44px;align-items:center;gap:10px;font-size:13px}
+label.row output{font:12px var(--f-mono);text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.seg{display:flex;border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+.seg button{flex:1;min-width:0;border:0;border-right:1px solid var(--ink);background:var(--sheet);color:var(--ink);
+  font:500 12px var(--f-body);padding:7px 4px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.seglbl{display:grid;gap:6px;font-size:13px}
+.checks{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px}
+.checks label{display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer}
+.checks input{accent-color:var(--accent);width:15px;height:15px;margin:0}
+.btn{border:1px solid var(--ink);background:var(--sheet);color:var(--ink);border-radius:6px;padding:8px 12px;
+  font:500 13px var(--f-body);cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:focus-visible,.seg button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+form.search{display:flex;gap:6px}
+form.search input{flex:1;min-width:0;border:1px solid var(--rule);background:var(--sheet);color:var(--ink);
+  border-radius:6px;padding:8px 10px;font:13px var(--f-body)}
+select{width:100%;border:1px solid var(--rule);background:var(--sheet);color:var(--ink);border-radius:6px;padding:7px 8px;font:13px var(--f-body)}
+#results{list-style:none;margin:0;padding:0;display:grid;gap:2px;max-height:160px;overflow:auto}
+#results button{width:100%;text-align:left;border:0;background:var(--well);color:var(--ink);padding:6px 8px;border-radius:4px;font:12px var(--f-body);cursor:pointer}
+#results button:hover{background:var(--rule)}
+#minimap{height:170px;border:1px solid var(--rule);border-radius:6px;z-index:0}
+.coords{font:12px var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.note{font-size:12px;color:var(--muted);margin:0}
+.credits{padding-top:14px;font-size:11.5px;color:var(--muted);display:grid;gap:6px}
+.credits a{color:inherit}
+
+.stage{position:relative;min-width:0;background:#fff;overflow:hidden}
+#view{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#view:active{cursor:grabbing}
+#status{position:absolute;left:16px;top:16px;max-width:min(460px,calc(100% - 32px));background:var(--sheet);color:var(--ink);
+  border:1.5px solid var(--ink);border-radius:6px;padding:9px 12px;font:13px var(--f-body);box-shadow:3px 3px 0 var(--ink)}
+#status.err{border-color:var(--warn);box-shadow:3px 3px 0 var(--warn)}
+#status .sub{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.hud{position:absolute;right:16px;bottom:16px;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.hud .btn{box-shadow:2px 2px 0 var(--ink)}
+.keys{position:absolute;left:16px;bottom:16px;font:11.5px var(--f-mono);color:#555;background:rgba(255,255,255,.85);padding:6px 8px;border-radius:4px;line-height:1.6}
+.keys b{font-weight:500;color:#111}
+
+@media (max-width:820px){
+  .app{grid-template-columns:1fr;grid-template-rows:62vh auto;height:auto}
+  .stage{grid-row:1}
+  .panel{grid-row:2;border-right:0;overflow:visible}
+  .keys{display:none}
+}
+
+.stage{display:flex}
+.viewwrap{position:relative;flex:1 1 0;min-width:0;height:100%}
+.satpanel{flex:1 1 0;min-width:0;display:flex;flex-direction:column;border-left:2px solid var(--ink);background:var(--paper)}
+.sathead{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--rule)}
+.sathead .seg{flex:0 1 260px}
+.sathead a.btn{text-decoration:none;font-size:12px;padding:7px 10px}
+.satbody{position:relative;flex:1;min-height:0}
+.satbody iframe,#esriMap{position:absolute;inset:0;width:100%;height:100%;border:0}
+.satnote{margin:0;padding:6px 12px;font-size:11.5px;color:var(--muted);border-top:1px solid var(--rule)}
+.datecmp{display:grid;gap:3px;padding:8px 12px;font-size:12px;line-height:1.4;border-top:1px solid var(--rule);background:var(--sheet)}
+.datecmp b{font-weight:600}
+@media (max-width:820px){
+  .stage{flex-direction:column;height:auto}
+  .viewwrap{height:62vh;flex:none}
+  .satpanel{height:60vh;flex:none;border-left:0;border-top:2px solid var(--ink)}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="panel">
+    <header class="brand">
+      <h1>Naija Lijnwerk</h1>
+      <p>Echte straten in Nigeria als 3D-lijnwerk met rastertonen, voor manga- en stripachtergronden.</p>
+    </header>
+
+    <section class="grp" aria-labelledby="h-plek">
+      <h2 id="h-plek">Plek</h2>
+      <select id="preset" aria-label="Snelle keuze">
+        <option value="">Kies een plek in Nigeria…</option>
+      </select>
+      <form class="search" id="searchForm">
+        <input id="q" type="text" placeholder="Zoek: Wuse Market, of 6.4545, 3.3895" aria-label="Zoek een plek of plak coördinaten">
+        <button class="btn" type="submit">Zoek</button>
+      </form>
+      <ul id="results"></ul>
+      <div id="minimap" aria-label="Kaart: klik om de plek te kiezen"></div>
+      <div class="coords" id="coords">—</div>
+      <p class="note">Klik op de kaart om een plek te laden. Je kunt ook een Google Maps- of Google Earth-link plakken.</p>
+      <div class="btnrow"><label class="btn" for="osmFile" tabindex="0">Kaartbestand laden (.osm)</label>
+        <input type="file" id="osmFile" accept=".osm,.xml,.json,text/xml,application/json" hidden></div>
+      <p class="note">Laadt de kaart niet? Ga naar openstreetmap.org, zoom in op je plek, klik op <b>Exporteren</b> en dan op de blauwe knop. Laad het bestand <i>map.osm</i> hier.</p>
+    </section>
+
+    <section class="grp" aria-labelledby="h-gebied">
+      <h2 id="h-gebied">Gebied</h2>
+      <div class="seglbl">Breedte
+        <div class="seg" id="segSize" role="group" aria-label="Breedte van het gebied">
+          <button data-v="200">200 m</button><button data-v="300">300 m</button><button data-v="400">400 m</button><button data-v="600">600 m</button><button data-v="800">800 m</button>
+        </div>
+      </div>
+      <div class="seglbl">Verre omgeving (alleen gebouwen)
+        <div class="seg" id="segFar" role="group" aria-label="Verre omgeving">
+          <button data-v="0">Geen</button><button data-v="500">+500 m</button><button data-v="1000">+1 km</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="grp" aria-labelledby="h-stijl">
+      <h2 id="h-stijl">Tekenstijl</h2>
+      <div class="seg" id="segTone" role="group" aria-label="Stijl">
+        <button data-v="tone">Lijn + raster + zwart</button><button data-v="lines">Alleen lijnen</button>
+      </div>
+      <label class="row">Lijn<input id="lineW" type="range" min="0.5" max="3" step="0.1"><output for="lineW"></output></label>
+      <label class="row">Contour<input id="outline" type="range" min="0.5" max="4" step="0.1"><output for="outline"></output></label>
+      <label class="row">Rasterpunt<input id="cell" type="range" min="3" max="14" step="0.5"><output for="cell"></output></label>
+      <label class="row">Zon richting<input id="sunAz" type="range" min="0" max="359" step="1"><output for="sunAz"></output></label>
+      <label class="row">Zon hoogte<input id="sunEl" type="range" min="10" max="85" step="1"><output for="sunEl"></output></label>
+      <label class="row">Lens<input id="lens" type="range" min="12" max="85" step="1"><output for="lens"></output></label>
+      <div class="checks">
+        <label><input type="checkbox" id="shadows">Schaduwen</label>
+        <label><input type="checkbox" id="vertical">Verticalen recht</label>
+      </div>
+    </section>
+
+    <section class="grp" aria-labelledby="h-inhoud">
+      <h2 id="h-inhoud">Inhoud</h2>
+      <div class="checks">
+        <label><input type="checkbox" id="trees">Bomen en palmen</label>
+        <label><input type="checkbox" id="streetTrees">Extra erfbomen</label>
+        <label><input type="checkbox" id="windows">Ramen</label>
+        <label><input type="checkbox" id="roofs">Golfplaatdaken</label>
+        <label><input type="checkbox" id="poles">Palen en draden</label>
+        <label><input type="checkbox" id="boards">Reclameborden</label>
+        <label><input type="checkbox" id="stalls">Marktkraampjes</label>
+      </div>
+      <div class="seglbl">Bomen tekenen
+        <div class="seg" id="segTreeStyle" role="group" aria-label="Boomstijl">
+          <button data-v="tone">Raster en zwart</button><button data-v="lines">Alleen lijn</button>
+        </div>
+      </div>
+      <div class="seglbl">Mensen en verkeer (danfo, keke, okada)
+        <div class="seg" id="segCrowd" role="group" aria-label="Mensen en verkeer">
+          <button data-v="0">Geen</button><button data-v="0.4">Weinig</button><button data-v="1">Druk</button>
+        </div>
+      </div>
+      <div class="btnrow"><button class="btn" id="reroll" type="button">Onbekende hoogtes opnieuw gokken</button></div>
+      <p class="note" id="stats"></p>
+    </section>
+
+    <section class="grp" aria-labelledby="h-export">
+      <h2 id="h-export">Opslaan</h2>
+      <div class="seglbl">PNG, lange zijde
+        <div class="seg" id="segExport" role="group" aria-label="Exportgrootte">
+          <button data-v="2400">2400 px</button><button data-v="3600">3600 px</button><button data-v="4800">4800 px</button>
+        </div>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" id="transparent">Transparant papier</label>
+        <label><input type="checkbox" id="credit">Bronvermelding</label>
+      </div>
+      <div class="btnrow">
+        <button class="btn primary" id="savePng" type="button">PNG opslaan</button>
+        <button class="btn" id="saveGlb" type="button">3D-model (GLB)</button>
+      </div>
+      <p class="note">GLB opent in Blender of Clip Studio Paint, zodat je zelf camera en hoek kunt kiezen.</p>
+    </section>
+
+    <footer class="credits">
+      <span>Kaartdata © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> (ODbL). Zet deze bron bij je tekening als je hem publiceert.</span>
+      <span>Hoogtes die niet in OSM staan, worden geschat uit het soort gebouw en de grootte.</span>
+    </footer>
+  </aside>
+
+  <main class="stage">
+   <div class="viewwrap" id="viewWrap">
+    <canvas id="view"></canvas>
+    <div id="status" role="status">Laden…</div>
+    <div class="keys"><b>Sleep</b> draaien · <b>Rechts</b> schuiven · <b>Scroll</b> zoomen · <b>WASD</b> lopen · <b>Q/E</b> omhoog/omlaag · <b>Klik</b> speld · <b>F</b> naar speld</div>
+    <div class="hud">
+      <button class="btn" id="toPin" type="button">Camera naar speld</button>
+      <button class="btn" id="eye" type="button">Op ooghoogte</button>
+      <button class="btn" id="aerial" type="button">Vogelvlucht</button>
+      <button class="btn primary" id="satToggle" type="button" aria-pressed="false">Satelliet ernaast</button>
+    </div>
+   </div>
+   <section class="satpanel" id="satPanel" hidden aria-label="Satellietbeeld van dezelfde plek">
+     <div class="sathead">
+       <div class="seg" id="segSat" role="group" aria-label="Satellietkaart">
+         <button data-v="google" aria-pressed="true">Google Maps</button><button data-v="esri" aria-pressed="false">Volgt camera</button>
+       </div>
+       <a class="btn" id="geLink" href="https://earth.google.com/web/" target="_blank" rel="noopener">Google Earth 3D</a>
+       <a class="btn" id="svLink" href="https://www.google.com/maps" target="_blank" rel="noopener">Street View</a>
+     </div>
+     <div class="satbody">
+       <iframe id="gmap" title="Google Maps satelliet" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+       <div id="esriMap" hidden></div>
+     </div>
+     <div class="datecmp" id="dateCompare"></div>
+     <p class="satnote" id="satNote">Satellietbeeld volgt het midden van je 3D-beeld. De speld of het pijltje laat zien waar je camera staat.</p>
+   </section>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+'use strict';
+/* =========================================================
+   Naija Lijnwerk — OSM → 3D → manga lijnwerk
+   ========================================================= */
+
+/* ---------- instellingen ---------- */
+const DEFAULTS = {
+  lat: 6.4549, lon: 3.3893, name: 'Lagos – Balogun Market',
+  size: 400, far: 0, tone: 'tone', lineW: 1.0, outline: 1.6, cell: 6,
+  sunAz: 230, sunEl: 50, lens: 24, shadows: true, vertical: false,
+  trees: true, streetTrees: true, windows: true, roofs: true, poles: true, boards: true, stalls: true,
+  treeStyle: 'tone', crowd: 0.4, exportSize: 3600, transparent: false, credit: true, seed: 1
+};
+let O = Object.assign({}, DEFAULTS);
+try { const s = JSON.parse(localStorage.getItem('naija-lijnwerk') || 'null'); if (s) Object.assign(O, s); } catch (e) {}
+if (![0, 500, 1000].includes(+O.far)) O.far = 0;
+function saveState() { try { localStorage.setItem('naija-lijnwerk', JSON.stringify(O)); } catch (e) {} }
+
+const PRESETS = [
+  ['Lagos – Balogun Market (Lagos Island)', 6.4549, 3.3893],
+  ['Lagos – Broad Street / Marina', 6.4519, 3.3915],
+  ['Lagos – Idumota & Nnamdi Azikiwe St', 6.4590, 3.3870],
+  ['Lagos – Victoria Island, Adeola Odeku', 6.4296, 3.4208],
+  ['Lagos – Yaba, Herbert Macaulay Way', 6.5100, 3.3786],
+  ['Lagos – Ikeja, Computer Village', 6.5958, 3.3424],
+  ['Lagos – Surulere, Adeniran Ogunsanya', 6.4943, 3.3557],
+  ['Lagos – Oshodi', 6.5536, 3.3437],
+  ['Abuja – Central Business District', 9.0570, 7.4890],
+  ['Abuja – Wuse Market', 9.0697, 7.4723],
+  ['Kano – Kurmi Market (oude stad)', 12.0010, 8.5145],
+  ['Kano – Sabon Gari', 12.0080, 8.5350],
+  ['Ibadan – Dugbe', 7.3887, 3.8836],
+  ['Port Harcourt – Old GRA', 4.7869, 7.0081],
+  ['Enugu – Ogbete Main Market', 6.4413, 7.4925],
+  ['Benin City – Ring Road', 6.3350, 5.6037],
+  ['Kaduna – Ahmadu Bello Way', 10.5210, 7.4380],
+  ['Onitsha – Main Market', 6.1520, 6.7780],
+];
+
+/* ---------- kleine hulpjes ---------- */
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hseed() { let h = 2166136261; for (const x of arguments) { const lo = x | 0, hi = Math.floor(x / 4294967296) | 0; h ^= lo; h = Math.imul(h, 16777619); h ^= hi; h = Math.imul(h, 16777619); } return h >>> 0; }
+const pick = (r, arr) => arr[Math.floor(r() * arr.length) % arr.length];
+
+let statusTimer = null;
+function status(msg, sub, isErr) {
+  const el = $('status'); el.hidden = !msg; el.classList.toggle('err', !!isErr);
+  el.innerHTML = ''; if (!msg) return;
+  el.append(document.createTextNode(msg));
+  if (sub) { const s = document.createElement('span'); s.className = 'sub'; s.textContent = sub; el.append(s); }
+  clearTimeout(statusTimer);
+}
+function statusFade(ms) { clearTimeout(statusTimer); statusTimer = setTimeout(() => { $('status').hidden = true; }, ms); }
+
+/* ---------- projectie ---------- */
+let ORIGIN = { lat: O.lat, lon: O.lon };
+const MLAT = 110574;
+function mlon() { return 111320 * Math.cos(ORIGIN.lat * Math.PI / 180); }
+function proj(lat, lon) { return [(lon - ORIGIN.lon) * mlon(), -(lat - ORIGIN.lat) * MLAT]; }
+function unproj(x, z) { return { lat: ORIGIN.lat - z / MLAT, lon: ORIGIN.lon + x / mlon() }; }
+
+/* ---------- geometrie (2D, x/z) ---------- */
+function area2(r) { let a = 0; for (let i = 0, n = r.length; i < n; i++) { const p = r[i], q = r[(i + 1) % n]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; }
+function pip(p, r) { let ins = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const xi = r[i][0], zi = r[i][1], xj = r[j][0], zj = r[j][1]; if (((zi > p[1]) !== (zj > p[1])) && (p[0] < (xj - xi) * (p[1] - zi) / (zj - zi) + xi)) ins = !ins; } return ins; }
+function cleanRing(pts) {
+  const out = [];
+  for (const p of pts) { const q = out[out.length - 1]; if (!q || Math.abs(q[0] - p[0]) > 0.01 || Math.abs(q[1] - p[1]) > 0.01) out.push(p); }
+  if (out.length > 1) { const a = out[0], b = out[out.length - 1]; if (Math.abs(a[0] - b[0]) < 0.01 && Math.abs(a[1] - b[1]) < 0.01) out.pop(); }
+  return out;
+}
+function clipPoly(pts, H) {
+  const planes = [[0, 1, -H], [0, -1, -H], [1, 1, -H], [1, -1, -H]];
+  let out = pts;
+  for (const [a, s, b] of planes) {
+    const inp = out; out = []; if (!inp.length) break;
+    for (let i = 0; i < inp.length; i++) {
+      const P = inp[i], Q = inp[(i + 1) % inp.length];
+      const pin = P[a] * s >= b, qin = Q[a] * s >= b;
+      if (pin) out.push(P);
+      if (pin !== qin) { const t = (b - P[a] * s) / ((Q[a] - P[a]) * s); out.push([P[0] + (Q[0] - P[0]) * t, P[1] + (Q[1] - P[1]) * t]); }
+    }
+  }
+  return out;
+}
+function clipLine(pts, H) {
+  const inside = p => Math.abs(p[0]) <= H && Math.abs(p[1]) <= H;
+  const runs = []; let cur = null;
+  for (let i = 0; i < pts.length; i++) {
+    const keep = inside(pts[i]) || (i > 0 && inside(pts[i - 1])) || (i < pts.length - 1 && inside(pts[i + 1]));
+    if (keep) { if (!cur) { cur = []; runs.push(cur); } cur.push(pts[i]); } else cur = null;
+  }
+  return runs.filter(r => r.length > 1);
+}
+function OBB(pts) {
+  let best = null;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length];
+    const ang = Math.atan2(b[1] - a[1], b[0] - a[0]), c = Math.cos(ang), s = Math.sin(ang);
+    let mnu = 1e9, mxu = -1e9, mnv = 1e9, mxv = -1e9;
+    for (const p of pts) { const u = p[0] * c + p[1] * s, v = -p[0] * s + p[1] * c; if (u < mnu) mnu = u; if (u > mxu) mxu = u; if (v < mnv) mnv = v; if (v > mxv) mxv = v; }
+    const A = (mxu - mnu) * (mxv - mnv);
+    if (!best || A < best.A) { const cu = (mnu + mxu) / 2, cv = (mnv + mxv) / 2; best = { A, ang, l: mxu - mnu, w: mxv - mnv, cx: cu * c - cv * s, cz: cu * s + cv * c }; }
+  }
+  if (!best) return null;
+  if (best.w > best.l) { const t = best.l; best.l = best.w; best.w = t; best.ang += Math.PI / 2; }
+  best.c = Math.cos(best.ang); best.s = Math.sin(best.ang);
+  return best;
+}
+function sampler(pts) {
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  return {
+    len: cum[cum.length - 1],
+    at(s) {
+      let i = 1; while (i < cum.length - 1 && cum[i] < s) i++;
+      const a = pts[i - 1], b = pts[i], seg = (cum[i] - cum[i - 1]) || 1;
+      const t = Math.max(0, Math.min(1, (s - cum[i - 1]) / seg));
+      return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, (b[0] - a[0]) / seg, (b[1] - a[1]) / seg];
+    }
+  };
+}
+class Grid {
+  constructor(c) { this.c = c; this.m = new Map(); }
+  add(minx, minz, maxx, maxz, item) {
+    const c = this.c;
+    for (let i = Math.floor(minx / c); i <= Math.floor(maxx / c); i++)
+      for (let j = Math.floor(minz / c); j <= Math.floor(maxz / c); j++) {
+        const k = i + ',' + j; let a = this.m.get(k); if (!a) this.m.set(k, a = []); a.push(item);
+      }
+  }
+  get(x, z) { return this.m.get(Math.floor(x / this.c) + ',' + Math.floor(z / this.c)) || []; }
+}
+
+/* ---------- OSM ophalen ---------- */
+const OVERPASS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.osm.jp/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+];
+let epIndex = 0;
+function bboxStr(lat, lon, half) {
+  const dLat = half / MLAT, dLon = half / (111320 * Math.cos(lat * Math.PI / 180));
+  return [lat - dLat, lon - dLon, lat + dLat, lon + dLon].map(v => v.toFixed(6)).join(',');
+}
+function buildQueries(lat, lon, half, farHalf) {
+  const near = bboxStr(lat, lon, half + 40), big = bboxStr(lat, lon, Math.max(farHalf, half + 40));
+  const head = '[out:json][timeout:55];';
+  return [
+    { key: 'gebouwen', label: 'gebouwen', essential: true, q: `${head}(way["building"](${big});relation["building"]["type"="multipolygon"](${big}););out meta geom qt;` },
+    { key: 'wegen', label: 'wegen', essential: true, q: `${head}(way["highway"](${near});way["railway"~"^(rail|light_rail|tram|narrow_gauge)$"](${near}););out geom qt;` },
+    { key: 'natuur', label: 'bomen, parken en markten', essential: false, q: `${head}(
+way["natural"~"^(water|wood|scrub|tree_row|wetland)$"](${near});
+way["waterway"~"^(river|canal|stream|drain|ditch|riverbank)$"](${near});
+way["landuse"~"^(grass|forest|meadow|recreation_ground|cemetery|orchard|village_green)$"](${near});
+way["leisure"~"^(park|garden|pitch|playground)$"](${near});
+way["amenity"="marketplace"](${near});
+node["natural"="tree"](${near});
+node["highway"~"^(traffic_signals|street_lamp|crossing)$"](${near});
+);out geom qt;` },
+    { key: 'water', label: 'lagune en zee', essential: false, q: `${head}relation["natural"="water"](${near});out geom(${near}) qt;` },
+  ];
+}
+async function overpass(q, label) {
+  let lastErr = null;
+  for (let k = 0; k < OVERPASS.length; k++) {
+    const idx = (epIndex + k) % OVERPASS.length, ep = OVERPASS[idx];
+    status('Kaartdata ophalen: ' + label + '…', 'Server: ' + new URL(ep).host + (k ? ' (vorige was vol of traag)' : ''));
+    try {
+      let tm = null;
+      const timeout = new Promise((_, rej) => { tm = setTimeout(() => rej(new Error('geen antwoord binnen 65 seconden')), 65000); });
+      const r = await Promise.race([
+        fetch(ep, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }),
+        timeout
+      ]);
+      clearTimeout(tm);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      if (j.remark && /runtime error|timed out|out of memory|Dispatcher/i.test(j.remark)) throw new Error(j.remark);
+      epIndex = idx; return j;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('Geen server bereikbaar');
+}
+
+/* officiële OSM-API (zelfde bron als 'Exporteren' op openstreetmap.org) en .osm-bestanden */
+function osmXmlToElements(text) {
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if (doc.querySelector('parsererror')) throw new Error('bestand is geen geldig OSM-bestand');
+  const tagsOf = el => { const t = {}; for (const c of el.children) if (c.tagName === 'tag') t[c.getAttribute('k')] = c.getAttribute('v'); return t; };
+  const nodes = new Map(), ways = new Map(), out = [];
+  for (const n of doc.getElementsByTagName('node')) {
+    const id = +n.getAttribute('id'), lat = +n.getAttribute('lat'), lon = +n.getAttribute('lon');
+    nodes.set(id, { lat, lon });
+    const t = tagsOf(n); if (Object.keys(t).length) out.push({ type: 'node', id, lat, lon, tags: t });
+  }
+  for (const w of doc.getElementsByTagName('way')) {
+    const id = +w.getAttribute('id'), refs = [];
+    for (const c of w.children) if (c.tagName === 'nd') refs.push(+c.getAttribute('ref'));
+    const geometry = refs.map(r => nodes.get(r) || null);
+    const el = { type: 'way', id, nodes: refs, geometry, tags: tagsOf(w), timestamp: w.getAttribute('timestamp') || undefined };
+    ways.set(id, el); if (geometry.filter(Boolean).length > 1) out.push(el);
+  }
+  for (const r of doc.getElementsByTagName('relation')) {
+    const members = [];
+    for (const c of r.children) if (c.tagName === 'member' && c.getAttribute('type') === 'way') {
+      const w = ways.get(+c.getAttribute('ref'));
+      members.push({ type: 'way', ref: +c.getAttribute('ref'), role: c.getAttribute('role'), geometry: w ? w.geometry : null });
+    }
+    out.push({ type: 'relation', id: +r.getAttribute('id'), members, tags: tagsOf(r), timestamp: r.getAttribute('timestamp') || undefined });
+  }
+  let bounds = null; const b = doc.getElementsByTagName('bounds')[0];
+  if (b) bounds = { lat: (+b.getAttribute('minlat') + +b.getAttribute('maxlat')) / 2, lon: (+b.getAttribute('minlon') + +b.getAttribute('maxlon')) / 2,
+    half: Math.min((+b.getAttribute('maxlat') - +b.getAttribute('minlat')) * MLAT / 2, 1000) };
+  return { elements: out, bounds };
+}
+async function osmApi(lat, lon, half) {
+  const dLat = half / MLAT, dLon = half / (111320 * Math.cos(lat * Math.PI / 180));
+  const bbox = [lon - dLon, lat - dLat, lon + dLon, lat + dLat].map(v => v.toFixed(6)).join(',');
+  status('Kaartdata ophalen…', 'Server: api.openstreetmap.org');
+  let tm = null;
+  const timeout = new Promise((_, rej) => { tm = setTimeout(() => rej(new Error('geen antwoord binnen 60 seconden')), 60000); });
+  const r = await Promise.race([fetch('https://api.openstreetmap.org/api/0.6/map?bbox=' + bbox), timeout]);
+  clearTimeout(tm);
+  if (r.status === 400) throw new Error('gebied heeft te veel data voor deze server');
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return osmXmlToElements(await r.text()).elements;
+}
+const idb = {
+  db: null,
+  open() { if (this.db) return Promise.resolve(this.db); return new Promise((res, rej) => { const r = indexedDB.open('naija-lijnwerk', 1); r.onupgradeneeded = () => r.result.createObjectStore('osm'); r.onsuccess = () => { this.db = r.result; res(r.result); }; r.onerror = () => rej(r.error); }); },
+  async get(k) { try { const db = await this.open(); return await new Promise(res => { const t = db.transaction('osm').objectStore('osm').get(k); t.onsuccess = () => res(t.result || null); t.onerror = () => res(null); }); } catch (e) { return null; } },
+  async set(k, v) { try { const db = await this.open(); db.transaction('osm', 'readwrite').objectStore('osm').put(v, k); } catch (e) {} }
+};
+
+/* ---------- OSM verwerken ---------- */
+function geomToPts(g) { return g.filter(Boolean).map(n => proj(n.lat, n.lon)); }
+function assembleRings(lists) {
+  const segs = lists.filter(l => l && l.length > 1).map(l => l.slice());
+  const same = (a, b) => a.lat === b.lat && a.lon === b.lon;
+  const rings = [];
+  while (segs.length) {
+    let cur = segs.shift(), guard = 0;
+    while (!same(cur[0], cur[cur.length - 1]) && guard++ < 2000) {
+      let found = false;
+      for (let i = 0; i < segs.length; i++) {
+        const s = segs[i], end = cur[cur.length - 1];
+        if (same(end, s[0])) cur = cur.concat(s.slice(1));
+        else if (same(end, s[s.length - 1])) cur = cur.concat(s.slice(0, -1).reverse());
+        else continue;
+        segs.splice(i, 1); found = true; break;
+      }
+      if (!found) break;
+    }
+    if (cur.length >= 4 && same(cur[0], cur[cur.length - 1])) rings.push(cur);
+  }
+  return rings;
+}
+function parseOSM(json, half) {
+  const D = { buildings: [], roads: [], rails: [], waters: [], waterLines: [], greens: [], markets: [], trees: [], treeRows: [], signals: [], lamps: [], crossings: [] };
+  const HN = half + 40;
+  for (const el of json.elements || []) {
+    const t = el.tags || {};
+    if (el.type === 'node') {
+      const p = proj(el.lat, el.lon); if (Math.abs(p[0]) > HN || Math.abs(p[1]) > HN) continue;
+      if (t.natural === 'tree') D.trees.push(p);
+      else if (t.highway === 'traffic_signals') D.signals.push(p);
+      else if (t.highway === 'street_lamp') D.lamps.push(p);
+      else if (t.highway === 'crossing') D.crossings.push(p);
+      continue;
+    }
+    let rings = null, line = null;
+    if (el.type === 'way' && el.geometry) {
+      const closed = el.nodes && el.nodes.length > 3 && el.nodes[0] === el.nodes[el.nodes.length - 1];
+      const pts = geomToPts(el.geometry);
+      if (closed) rings = { outer: [cleanRing(pts)], inner: [] }; else line = pts;
+    } else if (el.type === 'relation' && el.members) {
+      const outs = assembleRings(el.members.filter(m => m.type === 'way' && m.role !== 'inner' && m.geometry).map(m => m.geometry.filter(Boolean)));
+      const ins = assembleRings(el.members.filter(m => m.type === 'way' && m.role === 'inner' && m.geometry).map(m => m.geometry.filter(Boolean)));
+      rings = { outer: outs.map(r => cleanRing(geomToPts(r))), inner: ins.map(r => cleanRing(geomToPts(r))) };
+    }
+    if (t.building && t.building !== 'no' && rings) {
+      for (const o of rings.outer) {
+        if (o.length < 3) continue;
+        let cx = 0, cz = 0; for (const p of o) { cx += p[0]; cz += p[1]; } cx /= o.length; cz /= o.length;
+        const holes = rings.inner.filter(h => h.length > 2 && pip(h[0], o));
+        D.buildings.push({ id: el.id, tags: t, outer: o, holes, ts: el.timestamp ? Date.parse(el.timestamp) : null, far: Math.abs(cx) > half + 15 || Math.abs(cz) > half + 15 });
+      }
+      continue;
+    }
+    if (t.highway && line) {
+      if (/^(proposed|construction|platform|corridor|elevator|steps_no|raceway)$/.test(t.highway) || t.tunnel === 'yes' || t.area === 'yes') continue;
+      for (const run of clipLine(line, HN)) D.roads.push({ id: el.id, tags: t, pts: run });
+      continue;
+    }
+    if (t.highway && rings) continue;
+    if (t.railway && line) { for (const run of clipLine(line, HN)) D.rails.push({ id: el.id, pts: run }); continue; }
+    if (t.natural === 'tree_row' && line) { for (const run of clipLine(line, HN)) D.treeRows.push(run); continue; }
+    if (rings && (t.natural === 'water' || t.waterway === 'riverbank' || t.natural === 'wetland')) {
+      for (const o of rings.outer) { const c = clipPoly(o, HN); if (c.length > 2) D.waters.push({ outer: c, holes: rings.inner.map(h => clipPoly(h, HN)).filter(h => h.length > 2) }); }
+      continue;
+    }
+    if (t.waterway && line) { for (const run of clipLine(line, HN)) D.waterLines.push({ kind: t.waterway, pts: run }); continue; }
+    if (rings && t.amenity === 'marketplace') { for (const o of rings.outer) { const c = clipPoly(o, HN); if (c.length > 2) D.markets.push(c); } continue; }
+    if (rings && (t.landuse || t.leisure || t.natural)) {
+      const kind = t.natural === 'wood' || t.landuse === 'forest' ? 'wood' : t.natural === 'scrub' ? 'scrub' : t.leisure === 'pitch' ? 'pitch' : (t.leisure === 'park' || t.leisure === 'garden' || t.landuse === 'cemetery' || t.landuse === 'orchard') ? 'park' : 'grass';
+      for (const o of rings.outer) { const c = clipPoly(o, HN); if (c.length > 2) D.greens.push({ kind, ring: c }); }
+    }
+  }
+  return D;
+}
+
+/* ---------- THREE basis ---------- */
+const canvas = $('view');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true, logarithmicDepthBuffer: true, preserveDrawingBuffer: true });
+renderer.setClearColor(0xffffff, 1);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.autoUpdate = false;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 40000);
+const ambient = new THREE.AmbientLight(0xffffff, 0.45); scene.add(ambient);
+const sun = new THREE.DirectionalLight(0xffffff, 0.75); scene.add(sun); scene.add(sun.target);
+sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.04;
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.screenSpacePanning = false;
+controls.maxPolarAngle = Math.PI * 0.62;
+controls.minDistance = 2; controls.maxDistance = 6000;
+controls.enableDamping = false;
+const world = new THREE.Group(); scene.add(world);
+let wires = null;
+
+/* textures */
+const maxAniso = renderer.capabilities.getMaxAnisotropy();
+function windowTexture() {
+  const c = document.createElement('canvas'); c.width = 192; c.height = 205; const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+  g.fillStyle = '#c4c4c4'; g.fillRect(52, 58, 88, 89);
+  g.strokeStyle = '#000'; g.lineWidth = 5; g.strokeRect(52, 58, 88, 89);
+  g.lineWidth = 3; g.beginPath(); g.moveTo(96, 58); g.lineTo(96, 147); g.moveTo(52, 98); g.lineTo(140, 98); g.stroke();
+  g.fillStyle = '#000'; g.fillRect(44, 147, 104, 5);           /* vensterbank */
+  g.fillRect(0, 201, 192, 4);                                    /* verdiepingsrand */
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = maxAniso; return t;
+}
+function roofTexture() {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, 64, 64); g.fillStyle = '#000'; g.fillRect(0, 0, 5, 64);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = maxAniso; return t;
+}
+const MAT = {
+  plain: new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true }),
+  walls: new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, map: windowTexture() }),
+  roof: new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, map: roofTexture() }),
+  wire: new THREE.LineBasicMaterial({ color: 0x000000 }),
+};
+
+/* tags voor randdetectie */
+const TAG = { ground: 0, road: 1, path: 2, wall: 3, roof: 4, tree: 5, water: 6, prop: 7, mark: 8, rail: 10, railtrack: 11, pole: 12, sky: 255 };
+
+/* ---------- geometrie-bouwer ---------- */
+class GB {
+  constructor() { this.p = []; this.n = []; this.u = []; this.c = []; this.t = []; }
+  v(x, y, z, nx, ny, nz, u, w, c, t) { this.p.push(x, y, z); this.n.push(nx, ny, nz); this.u.push(u, w); this.c.push(c, c, c); this.t.push(t); }
+  tri(a, b, c, col, tag, hint, ua, ub, uc) {
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const l = Math.hypot(nx, ny, nz); if (l < 1e-10) return;
+    nx /= l; ny /= l; nz /= l;
+    ua = ua || [0, 0]; ub = ub || [0, 0]; uc = uc || [0, 0];
+    if (hint && nx * hint[0] + ny * hint[1] + nz * hint[2] < 0) { let t = b; b = c; c = t; t = ub; ub = uc; uc = t; nx = -nx; ny = -ny; nz = -nz; }
+    this.v(a[0], a[1], a[2], nx, ny, nz, ua[0], ua[1], col, tag);
+    this.v(b[0], b[1], b[2], nx, ny, nz, ub[0], ub[1], col, tag);
+    this.v(c[0], c[1], c[2], nx, ny, nz, uc[0], uc[1], col, tag);
+  }
+  quad(a, b, c, d, col, tag, hint, ua, ub, uc, ud) { this.tri(a, b, c, col, tag, hint, ua, ub, uc); this.tri(a, c, d, col, tag, hint, ua, uc, ud); }
+  get count() { return this.t.length; }
+  build() {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(this.u, 2));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
+    g.setAttribute('tag', new THREE.Float32BufferAttribute(this.t, 1));
+    g.computeBoundingSphere();
+    return g;
+  }
+}
+function prep(g) { const ng = g.index ? g.toNonIndexed() : g; return { p: ng.attributes.position.array, n: ng.attributes.normal.array, uv: ng.attributes.uv ? ng.attributes.uv.array : null }; }
+const PRIM = {
+  box: prep(new THREE.BoxGeometry(1, 1, 1)),
+  cyl6: prep(new THREE.CylinderGeometry(1, 1, 1, 6, 1)),
+  cyl8: prep(new THREE.CylinderGeometry(1, 1, 1, 10, 1)),
+  cylT: prep(new THREE.CylinderGeometry(0.72, 1, 1, 7, 1)),
+  cone: prep(new THREE.ConeGeometry(1, 1, 8, 1)),
+  ico0: prep(new THREE.IcosahedronGeometry(1, 0)),
+  ico1: prep(new THREE.IcosahedronGeometry(1, 1)),
+  ico2: prep(new THREE.IcosahedronGeometry(1, 2)),
+};
+const _v = new THREE.Vector3(), _n = new THREE.Vector3(), _nm = new THREE.Matrix3();
+function addPrim(gb, pr, m, col, tag) {
+  _nm.getNormalMatrix(m);
+  const P = pr.p, N = pr.n, U = pr.uv;
+  for (let i = 0, k = 0; i < P.length; i += 3, k += 2) {
+    _v.set(P[i], P[i + 1], P[i + 2]).applyMatrix4(m);
+    _n.set(N[i], N[i + 1], N[i + 2]).applyMatrix3(_nm).normalize();
+    gb.v(_v.x, _v.y, _v.z, _n.x, _n.y, _n.z, U ? U[k] : 0, U ? U[k + 1] : 0, col, tag);
+  }
+}
+const _q = new THREE.Quaternion(), _e = new THREE.Euler(), _p3 = new THREE.Vector3(), _s3 = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0), _d = new THREE.Vector3();
+function M(x, y, z, sx, sy, sz, rx, ry, rz) { _e.set(rx || 0, ry || 0, rz || 0); _q.setFromEuler(_e); return new THREE.Matrix4().compose(_p3.set(x, y, z), _q, _s3.set(sx, sy, sz)); }
+function ML(base, x, y, z, sx, sy, sz, rx, ry, rz) { return base.clone().multiply(M(x, y, z, sx, sy, sz, rx, ry, rz)); }
+function cylBetween(a, b, r) {
+  _d.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]); const len = _d.length(); _d.normalize();
+  _q.setFromUnitVectors(_up, _d);
+  return new THREE.Matrix4().compose(_p3.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2), _q, _s3.set(r, len, r));
+}
+function yawOf(dx, dz) { return Math.atan2(-dz, dx); }
+
+/* ---------- gebouwen ---------- */
+function num(s) { if (s == null) return null; const v = parseFloat(String(s).replace(',', '.')); return isFinite(v) ? v : null; }
+function heightOf(t, area, r) {
+  let minH = num(t.min_height) || 0;
+  const minLv = num(t['building:min_level']); if (minLv) minH = Math.max(minH, minLv * 3.2);
+  let h = num(t.height), lv = num(t['building:levels']), guessed = false;
+  if (h == null && lv != null) h = lv * 3.2 + 0.5;
+  if (h == null) {
+    guessed = true;
+    const b = String(t.building || 'yes').toLowerCase(), x = r();
+    let L = 1;
+    if (/^(hut|shed|kiosk|garage|garages|roof|carport|toilets|cabin|container|service)$/.test(b)) h = 2.6 + x * 0.7;
+    else if (/^(house|detached|semidetached_house|bungalow|terrace)$/.test(b)) L = x < 0.72 ? 1 : 2;
+    else if (/^(apartments|dormitory|hotel)$/.test(b)) L = 3 + Math.floor(x * 3);
+    else if (/^(commercial|retail|office|bank|supermarket)$/.test(b)) L = area < 250 ? 2 + Math.floor(x * 2) : area < 1500 ? 3 + Math.floor(x * 4) : 4 + Math.floor(x * 8);
+    else if (/^(industrial|warehouse|factory|hangar|manufacture)$/.test(b)) h = 6 + x * 4;
+    else if (/^(church|cathedral|mosque|chapel|temple)$/.test(b)) h = 9 + x * 6;
+    else if (/^(school|hospital|university|college|public|civic|government)$/.test(b)) L = 2 + Math.floor(x * 2);
+    else L = area < 90 ? 1 : area < 220 ? (x < 0.6 ? 1 : 2) : area < 600 ? 2 + Math.floor(x * 2) : area < 2000 ? 2 + Math.floor(x * 4) : 3 + Math.floor(x * 6);
+    if (h == null) h = L * 3.2 + 0.4 + r() * 0.5;
+    lv = L;
+  }
+  if (lv == null) lv = Math.max(1, Math.round(h / 3.2));
+  h = Math.max(h, minH + 2);
+  return { h, minH, levels: lv, guessed };
+}
+function addWalls(gb, ring, isHole, base, h, col, textured) {
+  const A = area2(ring); let sgn = A > 0 ? 1 : -1; if (isHole) sgn = -sgn;
+  let s = 0;
+  for (let i = 0, n = ring.length; i < n; i++) {
+    const a = ring[i], b = ring[(i + 1) % n];
+    const dx = b[0] - a[0], dz = b[1] - a[1], len = Math.hypot(dx, dz); if (len < 0.05) continue;
+    const hint = [sgn * dz / len, 0, -sgn * dx / len];
+    const u0 = s / 3, u1 = (s + len) / 3, v0 = base / 3.2, v1 = h / 3.2;
+    const tu = textured ? 1 : 0;
+    gb.quad([a[0], base, a[1]], [b[0], base, b[1]], [b[0], h, b[1]], [a[0], h, a[1]], col, TAG.wall, hint,
+      [u0 * tu, v0 * tu], [u1 * tu, v0 * tu], [u1 * tu, v1 * tu], [u0 * tu, v1 * tu]);
+    s += len;
+  }
+}
+function addFlat(gb, outer, holes, y, col, tag) {
+  try {
+    const contour = outer.map(p => new THREE.Vector2(p[0], p[1]));
+    const hs = holes.map(h => h.map(p => new THREE.Vector2(p[0], p[1])));
+    const faces = THREE.ShapeUtils.triangulateShape(contour.slice(), hs.map(h => h.slice()));
+    const all = outer.concat(...holes);
+    for (const f of faces) {
+      const a = all[f[0]], b = all[f[1]], c = all[f[2]]; if (!a || !b || !c) continue;
+      gb.tri([a[0], y, a[1]], [b[0], y, b[1]], [c[0], y, c[1]], col, tag, [0, 1, 0]);
+    }
+  } catch (e) {}
+}
+function addPitchedRoof(gbRoof, gbWall, ob, h, r, wallCol, hip) {
+  const tanp = 0.36 + r() * 0.14, o = 0.45;
+  const L = ob.l + 2 * o, W = ob.w + 2 * o, rise = W / 2 * tanp;
+  const c = ob.c, s = ob.s;
+  const P = (U, V, y) => [ob.cx + U * c - V * s, y, ob.cz + U * s + V * c];
+  const col = r() < 0.22 ? 0.62 : 0.95;
+  const up = [0, 1, 0], k = 1 / 0.55;
+  if (hip) {
+    const rh = Math.max((L - W) / 2, 0);
+    const E1 = P(-L / 2, -W / 2, h), E2 = P(L / 2, -W / 2, h), E3 = P(L / 2, W / 2, h), E4 = P(-L / 2, W / 2, h);
+    const R1 = P(-rh, 0, h + rise), R2 = P(rh, 0, h + rise);
+    gbRoof.quad(E1, E2, R2, R1, col, TAG.roof, up, [-L / 2 * k, 0], [L / 2 * k, 0], [rh * k, 1], [-rh * k, 1]);
+    gbRoof.quad(E3, E4, R1, R2, col, TAG.roof, up, [L / 2 * k, 0], [-L / 2 * k, 0], [-rh * k, 1], [rh * k, 1]);
+    gbRoof.tri(E4, E1, R1, col, TAG.roof, up, [W / 2 * k, 0], [-W / 2 * k, 0], [0, 1]);
+    gbRoof.tri(E2, E3, R2, col, TAG.roof, up, [-W / 2 * k, 0], [W / 2 * k, 0], [0, 1]);
+    gbWall.quad(E1, E2, E3, E4, 0.9, TAG.roof, [0, -1, 0]);
+  } else {
+    const Lg = ob.l + 0.3, ho = h + o * tanp;
+    const E1 = P(-Lg / 2, -W / 2, h), E2 = P(Lg / 2, -W / 2, h), E3 = P(Lg / 2, W / 2, h), E4 = P(-Lg / 2, W / 2, h);
+    const R1 = P(-Lg / 2, 0, h + rise), R2 = P(Lg / 2, 0, h + rise);
+    gbRoof.quad(E1, E2, R2, R1, col, TAG.roof, up, [-Lg / 2 * k, 0], [Lg / 2 * k, 0], [Lg / 2 * k, 1], [-Lg / 2 * k, 1]);
+    gbRoof.quad(E3, E4, R1, R2, col, TAG.roof, up, [Lg / 2 * k, 0], [-Lg / 2 * k, 0], [-Lg / 2 * k, 1], [Lg / 2 * k, 1]);
+    gbWall.quad(E1, E2, E3, E4, 0.9, TAG.roof, [0, -1, 0]);
+    for (const sd of [-1, 1]) {
+      const U = sd * ob.l / 2, hint = [sd * c, 0, sd * s];
+      const a = P(U, -ob.w / 2, h), b = P(U, ob.w / 2, h), a2 = P(U, -ob.w / 2, ho), b2 = P(U, ob.w / 2, ho), ap = P(U, 0, h + rise);
+      gbWall.quad(a, b, b2, a2, wallCol, TAG.wall, hint);
+      gbWall.tri(a2, b2, ap, wallCol, TAG.wall, hint);
+    }
+  }
+}
+function buildBuildings(D, G, gbs, rndBase) {
+  let n = 0, nGuess = 0;
+  const north = ORIGIN.lat > 10;
+  for (const b of D.buildings) {
+    const outer = b.outer; const area = Math.abs(area2(outer)); if (area < 4) continue;
+    const r = mulberry32(hseed(b.id, O.seed, 7));
+    const hi = heightOf(b.tags, area, r); if (hi.guessed) nGuess++;
+    const col = r() < 0.16 ? 0.8 : 1.0;
+    let pitched = false, ob = null, hip = true;
+    if (!b.far && O.roofs && !b.holes.length) {
+      const rs = String(b.tags['roof:shape'] || '').toLowerCase();
+      const smallish = area < 450 && hi.levels <= 2 && !b.tags.height;
+      const chance = north ? 0.3 : 0.88;
+      if (rs === 'hipped' || rs === 'gabled' || rs === 'pyramidal' || (!rs && smallish && r() < chance)) {
+        ob = OBB(outer);
+        if (ob && ob.l * ob.w > 0 && area / (ob.l * ob.w) > 0.8) { pitched = true; hip = rs === 'gabled' ? false : rs === 'hipped' ? true : r() < 0.72; }
+      }
+    }
+    const textured = O.windows && !b.far && hi.h - hi.minH >= 2.4;
+    const gw = textured ? gbs.walls : gbs.plain;
+    addWalls(gw, outer, false, hi.minH, hi.h, col, textured);
+    for (const hole of b.holes) addWalls(gw, hole, true, hi.minH, hi.h, col, textured);
+    if (pitched) addPitchedRoof(gbs.roof, gbs.plain, ob, hi.h, r, col, hip);
+    else {
+      addFlat(gbs.plain, outer, b.holes, hi.h, 0.97, TAG.roof);
+      if (!b.far && hi.levels >= 2 && area > 60 && r() < 0.55) {
+        /* borstwering + watertank (veel op Nigeriaanse daken) */
+        addParapet(gbs.plain, outer, hi.h, col);
+        if (r() < 0.45) {
+          let cx = 0, cz = 0; for (const p of outer) { cx += p[0]; cz += p[1]; } cx /= outer.length; cz /= outer.length;
+          if (pip([cx, cz], outer)) addPrim(gbs.plain, PRIM.cyl8, M(cx, hi.h + 1.6 + 0.65, cz, 0.75, 1.3, 0.75), 0.55, TAG.prop),
+            addPrim(gbs.plain, PRIM.box, M(cx, hi.h + 0.8, cz, 1.6, 1.6, 1.6), 0.9, TAG.prop);
+        }
+      }
+    }
+    if (!b.far) {
+      let minx = 1e9, minz = 1e9, maxx = -1e9, maxz = -1e9;
+      for (const p of outer) { if (p[0] < minx) minx = p[0]; if (p[0] > maxx) maxx = p[0]; if (p[1] < minz) minz = p[1]; if (p[1] > maxz) maxz = p[1]; }
+      G.b.add(minx, minz, maxx, maxz, outer);
+    }
+    n++;
+  }
+  return { n, nGuess };
+}
+function addParapet(gb, ring, h, col) {
+  const A = area2(ring), sgn = A > 0 ? 1 : -1, th = 0.22, ph = 0.9;
+  for (let i = 0, n = ring.length; i < n; i++) {
+    const a = ring[i], b = ring[(i + 1) % n];
+    const dx = b[0] - a[0], dz = b[1] - a[1], len = Math.hypot(dx, dz); if (len < 0.3) continue;
+    const nx = sgn * dz / len, nz = -sgn * dx / len;
+    const ai = [a[0] - nx * th, a[1] - nz * th], bi = [b[0] - nx * th, b[1] - nz * th];
+    gb.quad([a[0], h, a[1]], [b[0], h, b[1]], [b[0], h + ph, b[1]], [a[0], h + ph, a[1]], col, TAG.wall, [nx, 0, nz]);
+    gb.quad([ai[0], h, ai[1]], [bi[0], h, bi[1]], [bi[0], h + ph, bi[1]], [ai[0], h + ph, ai[1]], col, TAG.wall, [-nx, 0, -nz]);
+    gb.quad([a[0], h + ph, a[1]], [b[0], h + ph, b[1]], [bi[0], h + ph, bi[1]], [ai[0], h + ph, ai[1]], col, TAG.wall, [0, 1, 0]);
+  }
+}
+
+/* ---------- wegen, water, spoor ---------- */
+const ROADW = { motorway: 13, trunk: 12, primary: 10, secondary: 8.5, tertiary: 7, residential: 5.5, unclassified: 5.5, living_street: 4.5, service: 3.6, track: 3.2, motorway_link: 6, trunk_link: 6, primary_link: 6, secondary_link: 5.5, tertiary_link: 5, pedestrian: 6, footway: 1.8, path: 1.5, cycleway: 1.8, bridleway: 1.5 };
+const ROADY = { motorway: 0.12, trunk: 0.12, primary: 0.11, secondary: 0.10, tertiary: 0.09 };
+function roadInfo(t) {
+  const k = t.highway; let w = ROADW[k] || 4;
+  const lanes = num(t.lanes); if (lanes && w > 4) w = Math.max(w, lanes * 3.2 + 0.6);
+  const wtag = num(t.width); if (wtag && wtag > 1 && wtag < 40) w = wtag;
+  const path = /^(footway|path|cycleway|bridleway|steps|pedestrian)$/.test(k);
+  return { hw: w / 2, path, y: path ? 0.05 : (ROADY[k] || 0.08), major: /^(motorway|trunk|primary|secondary)/.test(k), cls: k };
+}
+function segN(a, b) { const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [-dz / l, dx / l]; }
+function ribbon(gb, pts, hw, y, col, tag, caps) {
+  const n = pts.length; if (n < 2) return;
+  const Lp = [], Rp = [];
+  for (let i = 0; i < n; i++) {
+    const n1 = i > 0 ? segN(pts[i - 1], pts[i]) : null, n2 = i < n - 1 ? segN(pts[i], pts[i + 1]) : null;
+    let nx, nz, sc = 1;
+    if (n1 && n2) {
+      nx = n1[0] + n2[0]; nz = n1[1] + n2[1]; const l = Math.hypot(nx, nz);
+      if (l < 1e-6) { nx = n2[0]; nz = n2[1]; } else { nx /= l; nz /= l; sc = Math.min(1 / Math.max(nx * n2[0] + nz * n2[1], 0.35), 2.8); }
+    } else { const m = n1 || n2; nx = m[0]; nz = m[1]; }
+    Lp.push([pts[i][0] + nx * hw * sc, pts[i][1] + nz * hw * sc]); Rp.push([pts[i][0] - nx * hw * sc, pts[i][1] - nz * hw * sc]);
+  }
+  for (let i = 0; i < n - 1; i++) gb.quad([Lp[i][0], y, Lp[i][1]], [Rp[i][0], y, Rp[i][1]], [Rp[i + 1][0], y, Rp[i + 1][1]], [Lp[i + 1][0], y, Lp[i + 1][1]], col, tag, [0, 1, 0]);
+  if (caps) for (const p of [pts[0], pts[n - 1]]) disc(gb, p, hw, y - 0.002, col, tag);
+}
+function disc(gb, p, r, y, col, tag) {
+  const k = 10;
+  for (let i = 0; i < k; i++) {
+    const a0 = i / k * Math.PI * 2, a1 = (i + 1) / k * Math.PI * 2;
+    gb.tri([p[0], y, p[1]], [p[0] + Math.cos(a0) * r, y, p[1] + Math.sin(a0) * r], [p[0] + Math.cos(a1) * r, y, p[1] + Math.sin(a1) * r], col, tag, [0, 1, 0]);
+  }
+}
+function buildRoads(D, G, gb) {
+  for (const rd of D.roads) {
+    const ri = rd.ri = roadInfo(rd.tags);
+    ribbon(gb, rd.pts, ri.hw, ri.y, 1.0, ri.path ? TAG.path : TAG.road, true);
+    for (let i = 0; i < rd.pts.length - 1; i++) {
+      const a = rd.pts[i], b = rd.pts[i + 1], pad = ri.hw + 2;
+      G.r.add(Math.min(a[0], b[0]) - pad, Math.min(a[1], b[1]) - pad, Math.max(a[0], b[0]) + pad, Math.max(a[1], b[1]) + pad, { a, b, hw: ri.hw, path: ri.path });
+    }
+    /* middenstreep */
+    if (!ri.path && ri.hw * 2 >= 7 && rd.tags.oneway !== 'yes') {
+      const sm = sampler(rd.pts);
+      for (let s = 2; s + 3 < sm.len; s += 9) {
+        const a = sm.at(s), b = sm.at(s + 3);
+        ribbon(gb, [[a[0], a[1]], [b[0], b[1]]], 0.13, ri.y + 0.03, 1.0, TAG.mark, false);
+      }
+    }
+  }
+  /* zebrapaden */
+  for (const c of D.crossings) {
+    const seg = nearestRoad(G, c[0], c[1]); if (!seg || seg.path || seg.hw < 2.5) continue;
+    const dx = seg.b[0] - seg.a[0], dz = seg.b[1] - seg.a[1], l = Math.hypot(dx, dz) || 1, ux = dx / l, uz = dz / l, vx = -uz, vz = ux;
+    for (let o = -seg.hw + 0.6; o <= seg.hw - 0.5; o += 1.0) {
+      const cx = c[0] + vx * o, cz = c[1] + vz * o;
+      const p = (a, b) => [cx + ux * a + vx * b, 0.16, cz + uz * a + vz * b];
+      gb.quad(p(-1.5, -0.25), p(1.5, -0.25), p(1.5, 0.25), p(-1.5, 0.25), 0.62, TAG.mark, [0, 1, 0]);
+    }
+  }
+}
+function distSeg(x, z, a, b) {
+  const dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1;
+  const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / l2));
+  return Math.hypot(x - a[0] - dx * t, z - a[1] - dz * t);
+}
+function nearestRoad(G, x, z) { let best = null, bd = 6; for (const s of G.r.get(x, z)) { const d = distSeg(x, z, s.a, s.b); if (d < bd) { bd = d; best = s; } } return best; }
+function onRoad(G, x, z, margin) { for (const s of G.r.get(x, z)) if (distSeg(x, z, s.a, s.b) < s.hw + margin) return true; return false; }
+function inBuilding(G, x, z) { for (const r of G.b.get(x, z)) if (pip([x, z], r)) return true; return false; }
+function buildWater(D, gb) {
+  for (const w of D.waters) addFlat(gb, w.outer, w.holes, 0.04, 0.55, TAG.water);
+  const WW = { river: 22, canal: 10, riverbank: 0, stream: 3, drain: 1.4, ditch: 1.2 };
+  for (const l of D.waterLines) { const w = WW[l.kind]; if (w) ribbon(gb, l.pts, w / 2, 0.04, l.kind === 'drain' || l.kind === 'ditch' ? 0.3 : 0.55, TAG.water, true); }
+}
+function buildRails(D, gb) {
+  for (const r of D.rails) {
+    ribbon(gb, r.pts, 1.6, 0.07, 0.92, TAG.rail, false);
+    const n = r.pts.length; if (n < 2) continue;
+    for (const off of [-0.72, 0.72]) {
+      const sh = r.pts.map((p, i) => { const nn = segN(r.pts[Math.max(0, i - 1)], r.pts[Math.min(n - 1, i + (i === 0 ? 1 : 0))]); return [p[0] + nn[0] * off, p[1] + nn[1] * off]; });
+      ribbon(gb, sh, 0.07, 0.16, 0.15, TAG.railtrack, false);
+    }
+  }
+}
+
+/* ---------- bomen ---------- */
+function treeBroad(gb, x, z, r, det, fcol) {
+  const H = 5 + r() * 7, th = H * 0.42, R = H * 0.25;
+  addPrim(gb, PRIM.cylT, M(x, th / 2, z, 0.16 + H * 0.012, th, 0.16 + H * 0.012), 0.6, TAG.tree);
+  const k = 3 + Math.floor(r() * 3), pr = det ? PRIM.ico1 : PRIM.ico0;
+  for (let i = 0; i < k; i++) {
+    const a = r() * Math.PI * 2, d = i === 0 ? 0 : R * (0.35 + r() * 0.35);
+    const rr = R * (i === 0 ? 0.95 : 0.6 + r() * 0.3);
+    addPrim(gb, pr, M(x + Math.cos(a) * d, th + R * 0.8 + (r() - 0.3) * R * 0.5, z + Math.sin(a) * d, rr, rr * 0.82, rr, 0, r() * 6, 0), fcol, TAG.tree);
+  }
+}
+function treePalm(gb, x, z, r, fcol) {
+  const H = 7 + r() * 8, lean = r() * Math.PI * 2, la = 0.5 + r() * 1.6, segs = 6;
+  const P = t => [x + Math.cos(lean) * la * t * t, t * H, z + Math.sin(lean) * la * t * t];
+  for (let i = 0; i < segs; i++) addPrim(gb, PRIM.cyl6, cylBetween(P(i / segs), P((i + 1) / segs), 0.2 - i * 0.012), 0.7, TAG.tree);
+  const C = P(1);
+  addPrim(gb, PRIM.ico0, M(C[0], C[1] - 0.2, C[2], 0.5, 0.45, 0.5), fcol * 0.6, TAG.tree);
+  const nf = 9 + Math.floor(r() * 4);
+  for (let f = 0; f < nf; f++) {
+    const ang = f / nf * Math.PI * 2 + r() * 0.4, dx = Math.cos(ang), dz = Math.sin(ang), sx = -dz, sz = dx;
+    const Lf = 3 + r() * 1.6, lift = 0.25 + r() * 0.5, m = 7;
+    let prev = null;
+    for (let i = 0; i <= m; i++) {
+      const t = i / m, hor = t * Lf, y = C[1] + Lf * (lift * t - 0.95 * t * t);
+      const w = 0.62 * Math.sin(Math.PI * Math.min(t * 1.08 + 0.04, 1)) + 0.02, fold = w * 0.38;
+      const cx = C[0] + dx * hor, cz = C[2] + dz * hor;
+      const cur = { l: [cx + sx * w, y - fold, cz + sz * w], c: [cx, y, cz], r: [cx - sx * w, y - fold, cz - sz * w] };
+      if (prev) {
+        gb.quad(prev.l, prev.c, cur.c, cur.l, fcol, TAG.tree, [0, 1, 0]); gb.quad(prev.l, prev.c, cur.c, cur.l, fcol, TAG.tree, [0, -1, 0]);
+        gb.quad(prev.c, prev.r, cur.r, cur.c, fcol, TAG.tree, [0, 1, 0]); gb.quad(prev.c, prev.r, cur.r, cur.c, fcol, TAG.tree, [0, -1, 0]);
+      }
+      prev = cur;
+    }
+  }
+}
+function buildTrees(D, G, gb, rnd) {
+  if (!O.trees) return 0;
+  const pts = [];
+  for (const t of D.trees) pts.push(t);
+  for (const row of D.treeRows) { const sm = sampler(row); for (let s = 0; s <= sm.len; s += 7) { const a = sm.at(s); pts.push([a[0], a[1]]); } }
+  const H = O.size / 2;
+  for (const g of D.greens) {
+    if (g.kind === 'pitch') continue;
+    const dens = g.kind === 'wood' ? 1 / 45 : g.kind === 'scrub' ? 1 / 90 : g.kind === 'park' ? 1 / 160 : 1 / 380;
+    const area = Math.abs(area2(g.ring)); let cnt = Math.min(600, Math.round(area * dens));
+    let minx = 1e9, minz = 1e9, maxx = -1e9, maxz = -1e9;
+    for (const p of g.ring) { minx = Math.min(minx, p[0]); maxx = Math.max(maxx, p[0]); minz = Math.min(minz, p[1]); maxz = Math.max(maxz, p[1]); }
+    for (let tries = 0; cnt > 0 && tries < cnt * 6; tries++) {
+      const x = minx + rnd() * (maxx - minx), z = minz + rnd() * (maxz - minz);
+      if (pip([x, z], g.ring) && !inBuilding(G, x, z) && !onRoad(G, x, z, 1.5)) { pts.push([x, z]); cnt--; }
+    }
+  }
+  if (O.streetTrees) {
+    for (const rd of D.roads) {
+      const ri = rd.ri; if (!ri || ri.path || ri.major) continue;
+      const sm = sampler(rd.pts);
+      for (let s = rnd() * 20; s < sm.len; s += 16 + rnd() * 26) {
+        if (rnd() > 0.45) continue;
+        const a = sm.at(s), side = rnd() < 0.5 ? 1 : -1, off = ri.hw + 2.5 + rnd() * 6;
+        const x = a[0] - a[3] * off * side, z = a[1] + a[2] * off * side;
+        if (Math.abs(x) > H || Math.abs(z) > H) continue;
+        if (!inBuilding(G, x, z) && !onRoad(G, x, z, 1.2)) pts.push([x, z]);
+      }
+    }
+  }
+  const palmShare = ORIGIN.lat > 10 ? 0.12 : 0.42;
+  const fcol = O.treeStyle === 'lines' ? 0.97 : 0.42;
+  let n = 0; const cap = 3200;
+  for (const p of pts) {
+    if (n >= cap) break;
+    if (Math.abs(p[0]) > H + 30 || Math.abs(p[1]) > H + 30) continue;
+    const r = mulberry32(hseed(Math.round(p[0] * 10), Math.round(p[1] * 10), O.seed));
+    const det = Math.hypot(p[0], p[1]) < 200;
+    if (r() < palmShare) treePalm(gb, p[0], p[1], r, fcol); else treeBroad(gb, p[0], p[1], r, det, fcol);
+    n++;
+  }
+  return n;
+}
+
+/* ---------- mensen ---------- */
+function person(gb, base, r, opt) {
+  opt = opt || {};
+  const shirt = pick(r, [1, 0.96, 0.75, 0.5, 0.3, 0.12]), pants = pick(r, [0.12, 0.3, 0.6, 0.95]), skin = 0.48;
+  const wrapper = !opt.seated && r() < 0.38, y0 = opt.seated ? 0.45 : 0;
+  if (!opt.seated) {
+    if (wrapper) addPrim(gb, PRIM.cylT, ML(base, 0, 0.44, 0, 0.25, 0.88, 0.25), pick(r, [0.3, 0.55, 0.85, 0.12]), TAG.prop);
+    else { addPrim(gb, PRIM.box, ML(base, 0.04, 0.41, 0.1, 0.14, 0.82, 0.14), pants, TAG.prop); addPrim(gb, PRIM.box, ML(base, -0.04, 0.41, -0.1, 0.14, 0.82, 0.14), pants, TAG.prop); }
+  } else {
+    addPrim(gb, PRIM.box, ML(base, 0.25, y0 + 0.62, 0.17, 0.55, 0.14, 0.14), pants, TAG.prop);
+    addPrim(gb, PRIM.box, ML(base, 0.25, y0 + 0.62, -0.17, 0.55, 0.14, 0.14), pants, TAG.prop);
+    addPrim(gb, PRIM.box, ML(base, 0.5, y0 + 0.32, 0.2, 0.13, 0.6, 0.13), pants, TAG.prop);
+    addPrim(gb, PRIM.box, ML(base, 0.5, y0 + 0.32, -0.2, 0.13, 0.6, 0.13), pants, TAG.prop);
+  }
+  const ty = opt.seated ? y0 + 0.95 : 1.12;
+  addPrim(gb, PRIM.cylT, ML(base, 0, ty, 0, 0.2, 0.62, 0.17), shirt, TAG.prop);
+  if (opt.seated) { addPrim(gb, PRIM.box, ML(base, 0.28, ty + 0.12, 0.25, 0.55, 0.09, 0.09), shirt, TAG.prop); addPrim(gb, PRIM.box, ML(base, 0.28, ty + 0.12, -0.25, 0.55, 0.09, 0.09), shirt, TAG.prop); }
+  else { addPrim(gb, PRIM.box, ML(base, 0, ty - 0.03, 0.26, 0.09, 0.58, 0.09, 0.08, 0, 0), shirt, TAG.prop); addPrim(gb, PRIM.box, ML(base, 0, ty - 0.03, -0.26, 0.09, 0.58, 0.09, -0.08, 0, 0), shirt, TAG.prop); }
+  const hy = ty + 0.45;
+  addPrim(gb, PRIM.ico1, ML(base, 0, hy, 0, 0.115, 0.135, 0.11), skin, TAG.prop);
+  if (opt.helmet) addPrim(gb, PRIM.ico1, ML(base, 0, hy + 0.04, 0, 0.15, 0.13, 0.15), 0.15, TAG.prop);
+  else if (r() < 0.16) addPrim(gb, PRIM.ico1, ML(base, -0.02, hy + 0.1, 0, 0.18, 0.11, 0.17, 0, 0, -0.3), pick(r, [0.2, 0.6, 0.95]), TAG.prop); /* gele */
+  if (!opt.seated && r() < 0.2) { /* lading op het hoofd */
+    addPrim(gb, PRIM.cylT, ML(base, 0, hy + 0.24, 0, 0.36, 0.17, 0.36, Math.PI, 0, 0), pick(r, [0.55, 0.85, 0.3]), TAG.prop);
+    for (let i = 0; i < 4; i++) addPrim(gb, PRIM.ico0, ML(base, (r() - 0.5) * 0.35, hy + 0.36, (r() - 0.5) * 0.35, 0.11, 0.1, 0.11), pick(r, [0.4, 0.9]), TAG.prop);
+  }
+}
+
+/* ---------- voertuigen ---------- */
+function wheels(gb, base, xs, zs, rad) {
+  for (const x of xs) for (const z of zs) addPrim(gb, PRIM.cyl8, ML(base, x, rad, z, rad, 0.22, rad, Math.PI / 2, 0, 0), 0.08, TAG.prop);
+}
+function car(gb, base, r) {
+  const col = pick(r, [1, 1, 0.85, 0.55, 0.15]);
+  addPrim(gb, PRIM.box, ML(base, 0, 0.62, 0, 4.2, 0.72, 1.8), col, TAG.prop);
+  addPrim(gb, PRIM.box, ML(base, -0.25, 1.24, 0, 2.2, 0.55, 1.6), 0.28, TAG.prop);
+  addPrim(gb, PRIM.box, ML(base, -0.25, 1.54, 0, 2.05, 0.06, 1.55), col, TAG.prop);
+  wheels(gb, base, [-1.35, 1.35], [-0.82, 0.82], 0.34);
+}
+function danfo(gb, base) {
+  addPrim(gb, PRIM.box, ML(base, -0.2, 1.2, 0, 4.4, 1.55, 1.95), 0.56, TAG.prop);
+  addPrim(gb, PRIM.box, ML(base, 2.25, 0.9, 0, 0.7, 0.95, 1.9), 0.56, TAG.prop);
+  addPrim(gb, PRIM.box, ML(base, -0.1, 1.6, 0, 4.0, 0.5, 1.97), 0.2, TAG.prop);
+  addPrim(gb, PRIM.box, ML(base, 0, 1.0, 0, 4.92, 0.13, 1.98), 0.04, TAG.prop);
+  addPrim(gb, PRIM.box, ML(base, 0, 0.78, 0, 4.92, 0.13, 1.98), 0.04, TAG.prop);
+  wheels(gb, base, [-1.6, 1.7], [-0.88, 0.88], 0.36);
+}
+function keke(gb, base, r) {
+  const col = pick(r, [0.56, 0.56, 0.8]);
+  addPrim(gb, PRIM.box, ML(base, -0.2, 0.62, 0, 2.2, 0.55, 1.3), col, TAG.prop);
+  addPrim(gb, PRIM.box, ML(base, 0.95, 0.95, 0, 0.55, 0.95, 0.7), col, TAG.prop);
+  addPrim(gb, PRIM.box, ML(base, -1.25, 1.3, 0, 0.08, 1.3, 1.3), col, TAG.prop);
+  addPrim(gb, PRIM.box, ML(base, -0.15, 1.95, 0, 2.4, 0.07, 1.38), 0.12, TAG.prop);
+  for (const z of [-0.62, 0.62]) addPrim(gb, PRIM.box, ML(base, 0.9, 1.55, z, 0.05, 0.75, 0.05), 0.12, TAG.prop);
+  wheels(gb, base, [-0.8], [-0.6, 0.6], 0.27); wheels(gb, base, [1.15], [0], 0.27);
+}
+function okada(gb, base, r) {
+  addPrim(gb, PRIM.box, ML(base, 0, 0.62, 0, 1.4, 0.35, 0.26), 0.15, TAG.prop);
+  addPrim(gb, PRIM.box, ML(base, -0.25, 0.86, 0, 0.85, 0.12, 0.3), 0.08, TAG.prop);
+  addPrim(gb, PRIM.box, ML(base, 0.7, 1.08, 0, 0.06, 0.06, 0.72), 0.1, TAG.prop);
+  for (const x of [-0.72, 0.75]) addPrim(gb, PRIM.cyl8, ML(base, x, 0.31, 0, 0.31, 0.1, 0.31, Math.PI / 2, 0, 0), 0.08, TAG.prop);
+  person(gb, ML(base, -0.35, 0.0, 0, 1, 1, 1), r, { seated: true, helmet: r() < 0.5 });
+  if (r() < 0.5) person(gb, ML(base, -0.85, 0.05, 0, 1, 1, 1), r, { seated: true });
+}
+function truck(gb, base, r) {
+  addPrim(gb, PRIM.box, ML(base, 2.6, 1.55, 0, 1.9, 2.1, 2.3), pick(r, [1, 0.56]), TAG.prop);
+  addPrim(gb, PRIM.box, ML(base, -1.1, 1.85, 0, 5.2, 2.5, 2.4), pick(r, [1, 0.8, 0.3]), TAG.prop);
+  wheels(gb, base, [-2.6, -1.4, 2.6], [-1.0, 1.0], 0.48);
+}
+function buildTraffic(D, G, gb, rnd) {
+  const f = +O.crowd; if (!f) return { cars: 0, people: 0 };
+  let cars = 0, people = 0; const H = O.size / 2 + 10;
+  const inArea = (x, z) => Math.abs(x) < H && Math.abs(z) < H;
+  for (const rd of D.roads) {
+    const ri = rd.ri; if (!ri) continue;
+    const sm = sampler(rd.pts); if (sm.len < 8) continue;
+    const oneway = rd.tags.oneway === 'yes';
+    if (!ri.path && ri.cls !== 'track') {
+      for (let s = 4 + rnd() * 10; s < sm.len - 4; s += (ri.major ? 9 : 22) / f + rnd() * 30 / f) {
+        const a = sm.at(s); let side = rnd() < 0.5 ? 1 : -1; if (oneway) side = 1;
+        const lanes = Math.max(1, Math.floor(ri.hw / 3.2));
+        const lane = Math.floor(rnd() * lanes);
+        const off = oneway ? (rnd() - 0.5) * (ri.hw * 1.2) : side * (lane + 0.5) * Math.min(3.2, ri.hw / lanes);
+        const x = a[0] - a[3] * off, z = a[1] + a[2] * off;
+        if (!inArea(x, z)) continue;
+        const dir = oneway ? 1 : side;
+        const base = M(x, ri.y, z, 1, 1, 1, 0, yawOf(a[2] * dir, a[3] * dir), 0);
+        const k = rnd();
+        const vr = mulberry32(hseed(Math.round(x * 7), Math.round(z * 7), O.seed));
+        if (k < 0.42) car(gb, base, vr); else if (k < 0.62) danfo(gb, base); else if (k < 0.77) keke(gb, base, vr); else if (k < 0.95 || !ri.major) okada(gb, base, vr); else truck(gb, base, vr);
+        cars++;
+      }
+    }
+    if (ri.cls === 'motorway' || ri.cls === 'motorway_link') continue;
+    const step = ri.path ? 9 : (ri.major ? 7 : 12);
+    for (let s = rnd() * 6; s < sm.len; s += step / f + rnd() * 18 / f) {
+      const a = sm.at(s), side = rnd() < 0.5 ? 1 : -1;
+      const off = ri.path ? (rnd() - 0.5) * ri.hw : side * (ri.hw + 0.9 + rnd() * 1.6);
+      const x = a[0] - a[3] * off, z = a[1] + a[2] * off;
+      if (!inArea(x, z) || inBuilding(G, x, z)) continue;
+      const dir = rnd() < 0.5 ? 1 : -1, yaw = yawOf(a[2] * dir, a[3] * dir) + (rnd() - 0.5) * 0.6;
+      const sc = 0.94 + rnd() * 0.14;
+      person(gb, M(x, ri.path ? ri.y : 0, z, sc, sc, sc, 0, yaw, 0), mulberry32(hseed(Math.round(x * 13), Math.round(z * 13), O.seed)));
+      people++;
+      if (rnd() < 0.25 * f) { /* groepje */
+        const x2 = x + (rnd() - 0.5) * 1.6, z2 = z + (rnd() - 0.5) * 1.6;
+        if (!inBuilding(G, x2, z2) && !onRoad(G, x2, z2, -0.5)) { person(gb, M(x2, 0, z2, sc, sc, sc, 0, yaw + Math.PI + (rnd() - 0.5), 0), mulberry32(hseed(Math.round(x2 * 13), Math.round(z2 * 13), O.seed + 3))); people++; }
+      }
+    }
+  }
+  return { cars, people };
+}
+
+/* ---------- straatmeubilair ---------- */
+function umbrella(gb, x, z, r) {
+  const col = pick(r, [1, 0.56, 0.3]), h = 2.1 + r() * 0.3, rad = 1.1 + r() * 0.5;
+  addPrim(gb, PRIM.cyl6, M(x, h / 2, z, 0.035, h, 0.035), 0.2, TAG.prop);
+  addPrim(gb, PRIM.cone, M(x, h + 0.2, z, rad, 0.45, rad, 0, r() * 3, 0), col, TAG.prop);
+}
+function stall(gb, x, z, yaw, r) {
+  const base = M(x, 0, z, 1, 1, 1, 0, yaw, 0);
+  addPrim(gb, PRIM.box, ML(base, 0, 0.42, 0, 1.8, 0.84, 1.0), pick(r, [0.9, 0.7]), TAG.prop);
+  for (let i = 0; i < 5; i++) addPrim(gb, PRIM.ico0, ML(base, (r() - 0.5) * 1.4, 0.92, (r() - 0.5) * 0.7, 0.16, 0.13, 0.16), pick(r, [0.3, 0.6, 0.95]), TAG.prop);
+  for (const sx of [-0.85, 0.85]) for (const sz of [-0.45, 0.45]) addPrim(gb, PRIM.box, ML(base, sx, 1.2, sz, 0.05, 2.4, 0.05), 0.25, TAG.prop);
+  addPrim(gb, PRIM.box, ML(base, 0, 2.42, 0, 2.2, 0.05, 1.5, 0.08, 0, 0), pick(r, [0.95, 0.55]), TAG.prop);
+}
+function buildFurniture(D, G, gb, wirePos, rnd) {
+  const H = O.size / 2 + 10;
+  const inArea = (x, z) => Math.abs(x) < H && Math.abs(z) < H;
+  let poles = 0;
+  for (const rd of D.roads) {
+    const ri = rd.ri; if (!ri || ri.path) continue;
+    const sm = sampler(rd.pts); if (sm.len < 20) continue;
+    /* elektriciteitspalen met draden */
+    if (O.poles && /^(residential|tertiary|unclassified|secondary|living_street|service|tertiary_link)$/.test(ri.cls) && (ri.cls !== 'service' || rnd() < 0.35)) {
+      const side = rnd() < 0.5 ? 1 : -1; let prev = null;
+      for (let s = 3 + rnd() * 10; s < sm.len; s += 30 + rnd() * 8) {
+        const a = sm.at(s), off = side * (ri.hw + 0.7);
+        const x = a[0] - a[3] * off, z = a[1] + a[2] * off;
+        if (!inArea(x, z) || inBuilding(G, x, z)) { prev = null; continue; }
+        const yaw = yawOf(a[2], a[3]), base = M(x, 0, z, 1, 1, 1, 0, yaw, 0);
+        addPrim(gb, PRIM.cyl6, ML(base, 0, 4.5, 0, 0.13, 9, 0.13), 0.6, TAG.pole);
+        addPrim(gb, PRIM.box, ML(base, 0, 8.5, 0, 0.12, 0.12, 1.7), 0.5, TAG.pole);
+        const r2 = mulberry32(hseed(Math.round(x * 5), Math.round(z * 5)));
+        if (r2() < 0.18) addPrim(gb, PRIM.cyl8, ML(base, 0, 6.6, 0.38, 0.32, 1.0, 0.32), 0.45, TAG.pole);
+        const tops = [-0.75, 0, 0.75].map(o => { const v = new THREE.Vector3(0, 8.62, o).applyMatrix4(base); return [v.x, v.y, v.z]; });
+        if (prev) for (let k = 0; k < 3; k++) {
+          const A = prev[k], B = tops[k], dist = Math.hypot(B[0] - A[0], B[2] - A[2]), sag = dist * 0.035, N = 8;
+          for (let i = 0; i < N; i++) {
+            const t0 = i / N, t1 = (i + 1) / N;
+            const p = t => [A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t - sag * 4 * t * (1 - t), A[2] + (B[2] - A[2]) * t];
+            wirePos.push(...p(t0), ...p(t1));
+          }
+        }
+        prev = tops; poles++;
+      }
+    }
+    /* straatlantaarns op grote wegen */
+    if (ri.major) {
+      let side = 1;
+      for (let s = 10 + rnd() * 10; s < sm.len; s += 36) {
+        side = -side; const a = sm.at(s), off = side * (ri.hw + 0.5);
+        const x = a[0] - a[3] * off, z = a[1] + a[2] * off;
+        if (!inArea(x, z) || inBuilding(G, x, z)) continue;
+        /* lokale +x wijst naar de weg */
+        const yaw = yawOf(a[3] * side, -a[2] * side), base = M(x, 0, z, 1, 1, 1, 0, yaw, 0);
+        addPrim(gb, PRIM.cyl6, ML(base, 0, 4, 0, 0.09, 8, 0.09), 0.45, TAG.pole);
+        addPrim(gb, PRIM.box, ML(base, 0.8, 7.95, 0, 1.6, 0.08, 0.08), 0.45, TAG.pole);
+        addPrim(gb, PRIM.box, ML(base, 1.55, 7.88, 0, 0.6, 0.12, 0.26), 0.85, TAG.pole);
+      }
+    }
+    /* reclameborden */
+    if (O.boards && ri.major) {
+      for (let s = 40 + rnd() * 60; s < sm.len; s += 110 + rnd() * 80) {
+        if (rnd() > 0.55) continue;
+        const a = sm.at(s), side = rnd() < 0.5 ? 1 : -1, off = side * (ri.hw + 4.5);
+        const x = a[0] - a[3] * off, z = a[1] + a[2] * off;
+        if (!inArea(x, z) || inBuilding(G, x, z) || onRoad(G, x, z, 0.5)) continue;
+        const base = M(x, 0, z, 1, 1, 1, 0, yawOf(a[2], a[3]) + (rnd() - 0.5) * 0.5, 0);
+        for (const lx of [-1.9, 1.9]) addPrim(gb, PRIM.cyl8, ML(base, lx, 3.6, 0, 0.16, 7.2, 0.16), 0.5, TAG.pole);
+        addPrim(gb, PRIM.box, ML(base, 0, 8.7, 0, 6.4, 3.2, 0.3), 1.0, TAG.prop);
+        addPrim(gb, PRIM.box, ML(base, 0, 7.05, side * 0.5, 6.4, 0.08, 0.8), 0.6, TAG.prop);
+      }
+    }
+  }
+  /* verkeerslichten en losse lantaarns uit OSM */
+  for (const p of D.signals) { addPrim(gb, PRIM.cyl6, M(p[0], 1.8, p[1], 0.07, 3.6, 0.07), 0.3, TAG.pole); addPrim(gb, PRIM.box, M(p[0], 3.9, p[1], 0.35, 1.0, 0.3), 0.12, TAG.pole); }
+  for (const p of D.lamps) { if (inArea(p[0], p[1])) addPrim(gb, PRIM.cyl6, M(p[0], 3.5, p[1], 0.08, 7, 0.08), 0.45, TAG.pole), addPrim(gb, PRIM.box, M(p[0], 7.05, p[1], 0.5, 0.12, 0.3), 0.85, TAG.pole); }
+  /* markten */
+  let stalls = 0;
+  if (O.stalls) {
+    for (const m of D.markets) {
+      let minx = 1e9, minz = 1e9, maxx = -1e9, maxz = -1e9;
+      for (const p of m) { minx = Math.min(minx, p[0]); maxx = Math.max(maxx, p[0]); minz = Math.min(minz, p[1]); maxz = Math.max(maxz, p[1]); }
+      for (let x = minx + 2; x < maxx; x += 4.2) for (let z = minz + 2; z < maxz; z += 4.2) {
+        const jx = x + (rnd() - 0.5) * 1.2, jz = z + (rnd() - 0.5) * 1.2;
+        if (!pip([jx, jz], m) || inBuilding(G, jx, jz) || onRoad(G, jx, jz, 0.3) || !inArea(jx, jz) || rnd() < 0.3) continue;
+        const r = mulberry32(hseed(Math.round(jx * 9), Math.round(jz * 9), O.seed));
+        if (r() < 0.5) umbrella(gb, jx, jz, r); else stall(gb, jx, jz, r() * 3, r);
+        if (+O.crowd && r() < 0.5 * O.crowd) person(gb, M(jx + 1.4, 0, jz + (r() - 0.5), 1, 1, 1, 0, r() * 6, 0), r);
+        stalls++;
+      }
+    }
+    /* kraampjes langs kleine straten */
+    for (const rd of D.roads) {
+      const ri = rd.ri; if (!ri || ri.path || ri.major || ri.cls === 'service') continue;
+      const sm = sampler(rd.pts);
+      for (let s = rnd() * 30; s < sm.len; s += 25 + rnd() * 60) {
+        const a = sm.at(s), side = rnd() < 0.5 ? 1 : -1, off = side * (ri.hw + 1.6);
+        const x = a[0] - a[3] * off, z = a[1] + a[2] * off;
+        if (!inArea(x, z) || inBuilding(G, x, z)) continue;
+        const r = mulberry32(hseed(Math.round(x * 9), Math.round(z * 9), O.seed + 1));
+        if (r() < 0.6) umbrella(gb, x, z, r); else stall(gb, x, z, yawOf(a[2], a[3]), r);
+        stalls++;
+      }
+    }
+  }
+  return { poles, stalls };
+}
+
+/* ---------- scène opbouwen ---------- */
+let DATA = null, BUILD_STATS = {};
+function disposeWorld() {
+  for (const ch of world.children.slice()) { world.remove(ch); if (ch.geometry) ch.geometry.dispose(); }
+  wires = null;
+}
+async function rebuild() {
+  if (!DATA) return;
+  status('3D-scène bouwen…', 'Gebouwen, wegen, bomen en mensen plaatsen');
+  await sleep(30);
+  disposeWorld();
+  const t0 = performance.now();
+  const G = { b: new Grid(20), r: new Grid(20) };
+  const gbs = { plain: new GB(), walls: new GB(), roof: new GB() };
+  const props = new GB();
+  const rnd = mulberry32(hseed(O.seed, Math.round(ORIGIN.lat * 1e5), Math.round(ORIGIN.lon * 1e5)));
+  const bs = buildBuildings(DATA, G, gbs, rnd);
+  buildRoads(DATA, G, gbs.plain);
+  buildWater(DATA, gbs.plain);
+  buildRails(DATA, gbs.plain);
+  /* grond */
+  const S = 20000;
+  gbs.plain.quad([-S, 0, -S], [S, 0, -S], [S, 0, S], [-S, 0, S], 1.0, TAG.ground, [0, 1, 0]);
+  await sleep(0);
+  const nTrees = buildTrees(DATA, G, props, rnd);
+  const wirePos = [];
+  const fu = buildFurniture(DATA, G, props, wirePos, rnd);
+  const tr = buildTraffic(DATA, G, props, rnd);
+  const add = (gb, mat) => { if (!gb.count) return; const m = new THREE.Mesh(gb.build(), mat); m.castShadow = true; m.receiveShadow = true; m.matrixAutoUpdate = false; world.add(m); };
+  add(gbs.plain, MAT.plain); add(gbs.walls, MAT.walls); add(gbs.roof, MAT.roof); add(props, MAT.plain);
+  if (wirePos.length) {
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(wirePos, 3));
+    wires = new THREE.LineSegments(g, MAT.wire); wires.matrixAutoUpdate = false; world.add(wires);
+  }
+  BUILD_STATS = { buildings: bs.n, guessed: bs.nGuess, trees: nTrees, cars: tr.cars, people: tr.people, poles: fu.poles, stalls: fu.stalls, ms: Math.round(performance.now() - t0) };
+  OSM_AGE = osmAge(DATA);
+  $('stats').textContent = `${bs.n.toLocaleString('nl-NL')} gebouwen (${bs.nGuess.toLocaleString('nl-NL')} met geschatte hoogte) · ${nTrees} bomen · ${tr.people} mensen · ${tr.cars} voertuigen · ${fu.poles} palen.${OSM_AGE ? ' ' + OSM_AGE.text : ''}`;
+  showDates();
+  updateSun();
+  status(null);
+  if (!DATA.buildings.length) { status('Hier staan (nog) geen gebouwen in OpenStreetMap.', 'Kies een plek in een stadscentrum, of kijk op openstreetmap.org hoe goed deze buurt in kaart is.', true); }
+  requestRender();
+}
+
+/* ---------- laden ---------- */
+let loading = false;
+async function loadArea(lat, lon, name) {
+  if (loading) return; loading = true;
+  O.lat = lat; O.lon = lon; if (name) O.name = name; saveState();
+  ORIGIN = { lat, lon };
+  updateMiniMap();
+  $('coords').textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}${O.name ? ' · ' + O.name : ''}`;
+  const half = O.size / 2, farHalf = O.far ? half + O.far : 0;
+  try {
+    let elements = [], missing = [], apiErr = null;
+    const apiKey = `v3|api|${lat.toFixed(5)}|${lon.toFixed(5)}|${O.size}`;
+    const ca = await idb.get(apiKey);
+    if (ca && Date.now() - ca.t < 7 * 864e5) elements = ca.data;
+    else if (!O.far) {
+      try { elements = await osmApi(lat, lon, half + 20); idb.set(apiKey, { t: Date.now(), data: elements }); }
+      catch (e) { apiErr = e; elements = []; }
+    }
+    if (!elements.length)
+    for (const part of buildQueries(lat, lon, half, farHalf)) {
+      const key = `v3|${part.key}|${lat.toFixed(5)}|${lon.toFixed(5)}|${O.size}|${part.key === 'gebouwen' ? O.far : 0}`;
+      let js = null;
+      const c = await idb.get(key);
+      if (c && Date.now() - c.t < 7 * 864e5) js = c.data;
+      if (!js) {
+        try { js = await overpass(part.q, part.label); idb.set(key, { t: Date.now(), data: js }); }
+        catch (e) { if (part.essential) throw e; missing.push(part.label); continue; }
+      }
+      for (const el of js.elements || []) elements.push(el);
+    }
+    const json = { elements };
+    status('Kaartdata verwerken…', (json.elements || []).length.toLocaleString('nl-NL') + ' objecten');
+    await sleep(20);
+    DATA = parseOSM(json, half);
+    pin = null; pinMesh.visible = false;
+    await rebuild();
+    resetCamera();
+    lastGoogle = null; updateSat(true); IMG_DATE = null; if (satOpen) { showDates(); fetchImageryDate(lat, lon); }
+    if (missing.length) { status('Gelukt, maar zonder ' + missing.join(' en ') + '.', 'Die server was te druk. Kies later dezelfde plek opnieuw om ze alsnog te laden.'); statusFade(7000); }
+  } catch (e) {
+    status('Kaartdata ophalen lukte niet.', 'Geen enkele kaartserver gaf antwoord. Gebruik de knop "Kaartbestand laden" links (uitleg staat eronder). (' + (e && e.message ? e.message : e) + ')', true);
+  } finally { loading = false; }
+}
+
+/* ---------- renderen: kleur → normaal/tag → inkt ---------- */
+let rtColor = null, rtNormal = null, pixelScale = 1;
+function makeTargets(w, h) {
+  if (rtColor) { rtColor.dispose(); rtNormal.dispose(); if (rtNormal.depthTexture) rtNormal.depthTexture.dispose(); }
+  const opt = { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat };
+  rtColor = new THREE.WebGLRenderTarget(w, h, opt);
+  rtNormal = new THREE.WebGLRenderTarget(w, h, opt);
+  rtNormal.depthTexture = new THREE.DepthTexture(w, h, THREE.FloatType);
+  rtNormal.depthTexture.minFilter = rtNormal.depthTexture.magFilter = THREE.NearestFilter;
+  post.uniforms.tColor.value = rtColor.texture;
+  post.uniforms.tNormal.value = rtNormal.texture;
+  post.uniforms.tDepth.value = rtNormal.depthTexture;
+  post.uniforms.res.value.set(w, h);
+}
+const normalMat = new THREE.ShaderMaterial({
+  vertexShader: `
+    attribute float tag;
+    varying vec3 vN; varying float vTag;
+    #include <common>
+    #include <logdepthbuf_pars_vertex>
+    void main(){
+      vN = normalize(normalMatrix * normal); vTag = tag;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      #include <logdepthbuf_vertex>
+    }`,
+  fragmentShader: `
+    varying vec3 vN; varying float vTag;
+    #include <common>
+    #include <logdepthbuf_pars_fragment>
+    void main(){
+      #include <logdepthbuf_fragment>
+      gl_FragColor = vec4(normalize(vN) * 0.5 + 0.5, vTag / 255.0);
+    }`,
+  blending: THREE.NoBlending,
+});
+const post = new THREE.ShaderMaterial({
+  uniforms: {
+    tColor: { value: null }, tNormal: { value: null }, tDepth: { value: null },
+    res: { value: new THREE.Vector2(1, 1) }, far: { value: camera.far },
+    lineR: { value: 1 }, outR: { value: 1.5 }, cellPx: { value: 6 },
+    toneOn: { value: 1 }, transp: { value: 0 }, blk: { value: 0.2 }, t1: { value: 0.72 }, t2: { value: 0.4 }
+  },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  fragmentShader: `
+    precision highp float;
+    uniform sampler2D tColor, tNormal, tDepth;
+    uniform vec2 res; uniform float far, lineR, outR, cellPx, toneOn, transp, blk, t1, t2;
+    varying vec2 vUv;
+    float invW(vec2 uv){ float d = texture2D(tDepth, uv).x; return 1.0 / (exp2(d * log2(far + 1.0)) - 1.0 + 1e-4); }
+    float dots(float cov){
+      vec2 p = gl_FragCoord.xy / cellPx;
+      p = vec2(p.x + p.y, p.y - p.x) * 0.70710678;
+      vec2 f = fract(p) - 0.5;
+      float r = sqrt(cov / 3.14159265);
+      float aa = 0.8 / cellPx;
+      return 1.0 - smoothstep(r - aa, r + aa, length(f));
+    }
+    void main(){
+      vec2 px = 1.0 / res;
+      vec4 n0 = texture2D(tNormal, vUv);
+      vec3 nn0 = normalize(n0.xyz * 2.0 - 1.0);
+      float tag0 = floor(n0.a * 255.0 + 0.5);
+      float nthr = abs(tag0 - 5.0) < 0.5 ? 0.6 : 0.12;
+      float e = 0.0;
+      for (int i = 0; i < 8; i++) {
+        float a = float(i) * 0.78539816;
+        vec4 ni = texture2D(tNormal, vUv + vec2(cos(a), sin(a)) * lineR * px);
+        float ti = floor(ni.a * 255.0 + 0.5);
+        if (abs(ti - tag0) > 0.5) e = 1.0;
+        float dn = 1.0 - dot(nn0, normalize(ni.xyz * 2.0 - 1.0));
+        e = max(e, smoothstep(nthr, nthr + 0.15, dn));
+      }
+      float iw0 = invW(vUv);
+      for (int i = 0; i < 4; i++) {
+        float a = float(i) * 0.78539816;
+        vec2 o = vec2(cos(a), sin(a)) * outR * px;
+        float lap = abs(invW(vUv + o) + invW(vUv - o) - 2.0 * iw0) / iw0;
+        e = max(e, smoothstep(0.035, 0.08, lap));
+      }
+      float L = texture2D(tColor, vUv).r;
+      float ink = 0.0;
+      if (L < blk) ink = 1.0;
+      else if (toneOn > 0.5) {
+        if (L < t2) ink = dots(0.42);
+        else if (L < t1) ink = dots(0.15);
+      }
+      ink = max(ink, e);
+      if (transp > 0.5) gl_FragColor = vec4(0.0, 0.0, 0.0, ink);
+      else gl_FragColor = vec4(vec3(1.0 - ink), 1.0);
+    }`,
+  depthTest: false, depthWrite: false,
+});
+const postScene = new THREE.Scene(), postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const postQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post); postQuad.frustumCulled = false; postScene.add(postQuad);
+
+/* speld */
+const pinMesh = new THREE.Mesh(new THREE.ConeGeometry(1.2, 4, 10), new THREE.MeshBasicMaterial({ color: 0xd2452a }));
+pinMesh.rotation.x = Math.PI; pinMesh.visible = false; scene.add(pinMesh);
+let pin = null;
+
+function updateSun() {
+  const az = O.sunAz * Math.PI / 180, el = O.sunEl * Math.PI / 180;
+  const dir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el));
+  sun.position.copy(dir.multiplyScalar(3000)); sun.target.position.set(0, 0, 0); sun.target.updateMatrixWorld();
+  const ext = Math.max(O.size / 2 + 80, Math.min(O.far ? O.size / 2 + O.far : 0, 1100));
+  const sc = sun.shadow.camera; sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext; sc.near = 100; sc.far = 6500; sc.updateProjectionMatrix();
+  sun.castShadow = !!O.shadows;
+  renderer.shadowMap.needsUpdate = true;
+}
+
+function applyStyleUniforms(scale) {
+  post.uniforms.lineR.value = Math.max(0.75, O.lineW * 0.9 * scale);
+  post.uniforms.outR.value = Math.max(0.9, O.outline * 0.9 * scale);
+  post.uniforms.cellPx.value = O.cell * scale;
+  post.uniforms.toneOn.value = O.tone === 'tone' ? 1 : 0;
+  post.uniforms.blk.value = O.tone === 'tone' ? 0.2 : 0.1;
+}
+
+function renderScene(transparent) {
+  /* verticalen recht: camera even waterpas zetten en het beeld verschuiven */
+  const q = camera.quaternion.clone();
+  let shifted = false;
+  if (O.vertical) {
+    const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
+    const pitch = Math.max(-0.9, Math.min(0.9, Math.asin(dir.y)));
+    const hd = new THREE.Vector3(dir.x, 0, dir.z); if (hd.lengthSq() > 1e-6) {
+      hd.normalize(); camera.lookAt(camera.position.clone().add(hd));
+      const w = post.uniforms.res.value.x, h = post.uniforms.res.value.y;
+      const shift = -Math.tan(pitch) / Math.tan(camera.fov * Math.PI / 360) * h / 2;
+      camera.setViewOffset(w, h, 0, shift, w, h); shifted = true;
+    }
+  }
+  camera.updateMatrixWorld();
+  post.uniforms.transp.value = transparent ? 1 : 0;
+  renderer.setRenderTarget(rtColor); renderer.setClearColor(0xffffff, 1); renderer.clear();
+  renderer.render(scene, camera);
+  const wv = wires ? wires.visible : false, pv = pinMesh.visible;
+  if (wires) wires.visible = false; pinMesh.visible = false;
+  scene.overrideMaterial = normalMat;
+  renderer.setRenderTarget(rtNormal); renderer.setClearColor(new THREE.Color(0.5, 0.5, 1.0), 1.0); renderer.clear();
+  renderer.render(scene, camera);
+  scene.overrideMaterial = null;
+  if (wires) wires.visible = wv; pinMesh.visible = pv;
+  renderer.setRenderTarget(null); renderer.setClearColor(0xffffff, transparent ? 0 : 1); renderer.clear();
+  renderer.render(postScene, postCam);
+  if (shifted) { camera.clearViewOffset(); camera.quaternion.copy(q); camera.updateMatrixWorld(); }
+}
+
+let renderQueued = false, shadowDirty = true;
+function requestRender() { if (renderQueued) return; renderQueued = true; requestAnimationFrame(() => { renderQueued = false; frame(); }); }
+function frame() {
+  camera.fov = 2 * Math.atan(12 / O.lens) * 180 / Math.PI; camera.updateProjectionMatrix();
+  pinMesh.visible = !!pin;
+  applyStyleUniforms(pixelScale);
+  renderScene(false);
+}
+
+function resize() {
+  const st = canvas.parentElement, w = st.clientWidth, h = st.clientHeight;
+  pixelScale = Math.min(window.devicePixelRatio || 1, 2);
+  renderer.setPixelRatio(pixelScale); renderer.setSize(w, h, false);
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+  makeTargets(Math.round(w * pixelScale), Math.round(h * pixelScale));
+  requestRender();
+}
+window.addEventListener('resize', resize);
+
+/* ---------- camera ---------- */
+function resetCamera() {
+  const s = O.size;
+  controls.target.set(0, 0, 0);
+  camera.position.set(s * 0.42, s * 0.36, s * 0.55);
+  controls.update(); requestRender();
+}
+controls.addEventListener('change', requestRender);
+function eyeLevel() {
+  const p = pin ? new THREE.Vector3(pin.x, 0, pin.z) : controls.target.clone();
+  const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y = 0; if (dir.lengthSq() < 1e-6) dir.set(0, 0, -1); dir.normalize();
+  camera.position.set(p.x, 1.6, p.z);
+  controls.target.set(p.x + dir.x * 25, 5, p.z + dir.z * 25);
+  controls.update(); requestRender();
+}
+function toPin() {
+  if (!pin) { status('Klik eerst in de 3D-weergave of op de kaart om een speld te zetten.'); statusFade(2600); return; }
+  const off = camera.position.clone().sub(controls.target);
+  controls.target.set(pin.x, 0, pin.z); camera.position.copy(controls.target).add(off); controls.update(); requestRender();
+}
+$('eye').onclick = eyeLevel; $('toPin').onclick = toPin; $('aerial').onclick = resetCamera;
+
+let downAt = null;
+canvas.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+canvas.addEventListener('pointerup', e => {
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 4 || e.button !== 0) return;
+  const rect = canvas.getBoundingClientRect();
+  const nd = new THREE.Vector2((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / rect.height * 2 + 1);
+  const rc = new THREE.Raycaster(); rc.setFromCamera(nd, camera);
+  const hit = new THREE.Vector3();
+  if (rc.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit) && hit.distanceTo(camera.position) < 8000) {
+    pin = { x: hit.x, z: hit.z }; pinMesh.position.set(hit.x, 2.2, hit.z); requestRender(); updateSat(false);
+  }
+});
+const keys = new Set();
+window.addEventListener('keydown', e => {
+  if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName)) return;
+  const k = e.key.toLowerCase();
+  if (k === 'f') { toPin(); return; }
+  if ('wasdqe'.includes(k) || k.startsWith('arrow')) { keys.add(k); if (keys.size === 1) moveLoop(); e.preventDefault(); }
+});
+window.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+window.addEventListener('blur', () => keys.clear());
+function moveLoop() {
+  if (!keys.size) return;
+  const dist = camera.position.distanceTo(controls.target), sp = Math.max(0.4, Math.min(dist * 0.02, 12));
+  const f = new THREE.Vector3(); camera.getWorldDirection(f); f.y = 0; f.normalize();
+  const r = new THREE.Vector3(-f.z, 0, f.x), mv = new THREE.Vector3();
+  if (keys.has('w') || keys.has('arrowup')) mv.add(f);
+  if (keys.has('s') || keys.has('arrowdown')) mv.sub(f);
+  if (keys.has('d') || keys.has('arrowright')) mv.add(r);
+  if (keys.has('a') || keys.has('arrowleft')) mv.sub(r);
+  mv.multiplyScalar(sp);
+  if (keys.has('q')) mv.y += sp * 0.6;
+  if (keys.has('e')) mv.y -= sp * 0.6;
+  camera.position.add(mv); controls.target.add(mv);
+  if (camera.position.y < 0.6) { const d = 0.6 - camera.position.y; camera.position.y += d; controls.target.y += d; }
+  controls.update(); requestRender();
+  requestAnimationFrame(moveLoop);
+}
+
+/* ---------- export ---------- */
+function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); }
+function slug() { return String(O.name || 'nigeria').toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'nigeria'; }
+async function savePng() {
+  const st = canvas.parentElement, cw = st.clientWidth, ch = st.clientHeight;
+  const long = O.exportSize, W = cw >= ch ? long : Math.round(long * cw / ch), H = cw >= ch ? Math.round(long * ch / cw) : long;
+  status('PNG maken…', `${W} × ${H} px`); await sleep(30);
+  const scale = W / cw;
+  try {
+    renderer.setPixelRatio(1); renderer.setSize(W, H, false);
+    makeTargets(W, H);
+    applyStyleUniforms(scale);
+    camera.fov = 2 * Math.atan(12 / O.lens) * 180 / Math.PI; camera.updateProjectionMatrix();
+    const pv = pinMesh.visible; pinMesh.visible = false;
+    renderScene(O.transparent);
+    pinMesh.visible = pv;
+    const out = document.createElement('canvas'); out.width = W; out.height = H;
+    const g = out.getContext('2d'); g.drawImage(canvas, 0, 0);
+    if (O.credit) {
+      const fs = Math.round(H * 0.012) + 6;
+      g.font = `${fs}px "IBM Plex Sans", Arial, sans-serif`; g.textAlign = 'right'; g.textBaseline = 'bottom';
+      const txt = '© OpenStreetMap contributors';
+      if (!O.transparent) { const tw = g.measureText(txt).width; g.fillStyle = '#fff'; g.fillRect(W - tw - fs * 1.6, H - fs * 2.1, tw + fs * 1.6, fs * 2.1); }
+      g.fillStyle = '#000'; g.fillText(txt, W - fs * 0.8, H - fs * 0.6);
+    }
+    await new Promise(res => out.toBlob(b => { download(b, `naija-${slug()}-${W}x${H}.png`); res(); }, 'image/png'));
+    status('PNG opgeslagen.', `${W} × ${H} px`); statusFade(2500);
+  } catch (e) {
+    status('Opslaan lukte niet op dit formaat.', 'Kies een kleiner formaat; sommige videokaarten kunnen niet zo groot tekenen.', true);
+  } finally { resize(); }
+}
+function saveGlb() {
+  if (!THREE.GLTFExporter) { status('De GLB-export kon niet laden.', '', true); return; }
+  status('3D-model maken…');
+  const grp = new THREE.Group();
+  for (const ch of world.children) if (ch.isMesh) grp.add(new THREE.Mesh(ch.geometry, ch.material));
+  new THREE.GLTFExporter().parse(grp, res => { download(new Blob([res], { type: 'model/gltf-binary' }), `naija-${slug()}.glb`); status('3D-model opgeslagen.'); statusFade(2500); }, { binary: true });
+}
+$('savePng').onclick = savePng; $('saveGlb').onclick = saveGlb;
+
+/* ---------- zoeken ---------- */
+function parseCoords(s) {
+  const m = s.match(/@(-?\d+\.\d+),\s*(-?\d+\.\d+)/) || s.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) ||
+    s.match(/[?&](?:q|ll|query|center)=(-?\d+\.\d+)(?:,|%2C)\s*(-?\d+\.\d+)/i) ||
+    s.match(/^\s*(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)\s*$/);
+  if (!m) return null; const lat = +m[1], lon = +m[2];
+  return (Math.abs(lat) <= 90 && Math.abs(lon) <= 180) ? { lat, lon } : null;
+}
+$('searchForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const q = $('q').value.trim(); if (!q) return;
+  const c = parseCoords(q); const ul = $('results'); ul.innerHTML = '';
+  if (c) { loadArea(c.lat, c.lon, `${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}`); return; }
+  try {
+    const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=8&countrycodes=ng&accept-language=nl,en&q=' + encodeURIComponent(q));
+    const js = await r.json();
+    if (!js.length) { const li = document.createElement('li'); li.className = 'note'; li.textContent = 'Niets gevonden in Nigeria. Probeer een andere spelling of plak coördinaten.'; ul.append(li); return; }
+    for (const it of js) {
+      const li = document.createElement('li'), b = document.createElement('button'); b.type = 'button';
+      b.textContent = it.display_name; b.onclick = () => { ul.innerHTML = ''; loadArea(+it.lat, +it.lon, it.display_name.split(',').slice(0, 2).join(',')); };
+      li.append(b); ul.append(li);
+    }
+  } catch (err) { const li = document.createElement('li'); li.className = 'note'; li.textContent = 'Zoeken lukte niet. Plak anders coördinaten of klik op de kaart.'; ul.append(li); }
+});
+for (const [n, la, lo] of PRESETS) { const o = document.createElement('option'); o.value = la + ',' + lo; o.textContent = n; $('preset').append(o); }
+$('preset').addEventListener('change', e => { if (!e.target.value) return; const [la, lo] = e.target.value.split(',').map(Number); loadArea(la, lo, e.target.selectedOptions[0].textContent); });
+
+
+/* ---------- eigen kaartbestand ---------- */
+$('osmFile').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  e.target.value = '';
+  try {
+    status('Kaartbestand lezen…', f.name); await sleep(20);
+    const text = await f.text();
+    let elements, bounds = null;
+    if (/^\s*\{/.test(text)) elements = JSON.parse(text).elements || [];
+    else ({ elements, bounds } = osmXmlToElements(text));
+    if (!bounds) {
+      let a = 90, b = -90, c = 180, d = -180;
+      for (const el of elements) for (const g of (el.geometry || (el.lat != null ? [el] : []))) if (g) { a = Math.min(a, g.lat); b = Math.max(b, g.lat); c = Math.min(c, g.lon); d = Math.max(d, g.lon); }
+      if (a > b) throw new Error('geen kaartdata in dit bestand');
+      bounds = { lat: (a + b) / 2, lon: (c + d) / 2, half: Math.min((b - a) * MLAT / 2, 1000) };
+    }
+    O.lat = bounds.lat; O.lon = bounds.lon; O.name = f.name.replace(/\.[^.]+$/, '');
+    O.size = Math.max(100, Math.round(bounds.half * 2)); saveState();
+    ORIGIN = { lat: O.lat, lon: O.lon }; updateMiniMap();
+    for (const b of $('segSize').querySelectorAll('button')) b.setAttribute('aria-pressed', String(+b.dataset.v === O.size));
+    $('coords').textContent = `${O.lat.toFixed(5)}, ${O.lon.toFixed(5)} · ${O.name}`;
+    status('Kaartdata verwerken…', elements.length.toLocaleString('nl-NL') + ' objecten'); await sleep(20);
+    DATA = parseOSM({ elements }, O.size / 2);
+    pin = null; pinMesh.visible = false;
+    await rebuild(); resetCamera();
+  } catch (err) { status('Dit bestand kon ik niet lezen.', String(err && err.message || err), true); }
+});
+
+/* ---------- minikaart ---------- */
+let mini = null, miniRect = null;
+function initMiniMap() {
+  if (!window.L) { $('minimap').hidden = true; return; }
+  mini = L.map('minimap', { zoomControl: true, attributionControl: true }).setView([O.lat, O.lon], 15);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Kaart © Esri, HERE, Garmin, © OpenStreetMap' }).addTo(mini);
+  mini.on('click', e => loadArea(e.latlng.lat, e.latlng.lng, `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`));
+}
+function updateMiniMap() {
+  if (!mini) return;
+  const half = O.size / 2, dLat = half / MLAT, dLon = half / (111320 * Math.cos(O.lat * Math.PI / 180));
+  const b = [[O.lat - dLat, O.lon - dLon], [O.lat + dLat, O.lon + dLon]];
+  if (miniRect) miniRect.setBounds(b); else miniRect = L.rectangle(b, { color: '#0b7a46', weight: 2, fillOpacity: 0.08 }).addTo(mini);
+  mini.setView([O.lat, O.lon], Math.max(mini.getZoom(), 14));
+}
+
+/* ---------- bediening koppelen ---------- */
+function bindSeg(id, key, onChange, asNum) {
+  const el = $(id);
+  const sync = () => { for (const b of el.querySelectorAll('button')) b.setAttribute('aria-pressed', String(String(O[key]) === b.dataset.v)); };
+  el.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; O[key] = asNum ? +b.dataset.v : b.dataset.v; sync(); saveState(); onChange(); });
+  sync();
+}
+function bindRange(id, fmt, onChange) {
+  const el = $(id), out = el.parentElement.querySelector('output');
+  el.value = O[id]; out.textContent = fmt(O[id]);
+  el.addEventListener('input', () => { O[id] = +el.value; out.textContent = fmt(O[id]); saveState(); onChange(); });
+}
+function bindCheck(id, onChange) { const el = $(id); el.checked = !!O[id]; el.addEventListener('change', () => { O[id] = el.checked; saveState(); onChange(); }); }
+
+const rerender = () => requestRender();
+const resun = () => { updateSun(); requestRender(); };
+let rebuildTimer = null; const rebuildSoon = () => { clearTimeout(rebuildTimer); rebuildTimer = setTimeout(rebuild, 120); };
+const reload = () => loadArea(O.lat, O.lon, O.name);
+
+bindSeg('segSize', 'size', reload, true);
+bindSeg('segFar', 'far', reload, true);
+bindSeg('segTone', 'tone', rerender);
+bindSeg('segTreeStyle', 'treeStyle', rebuildSoon);
+bindSeg('segCrowd', 'crowd', rebuildSoon, true);
+bindSeg('segExport', 'exportSize', () => {}, true);
+bindRange('lineW', v => v.toFixed(1), rerender);
+bindRange('outline', v => v.toFixed(1), rerender);
+bindRange('cell', v => v.toFixed(1), rerender);
+bindRange('sunAz', v => Math.round(v) + '°', resun);
+bindRange('sunEl', v => Math.round(v) + '°', resun);
+bindRange('lens', v => Math.round(v) + ' mm', rerender);
+bindCheck('shadows', resun); bindCheck('vertical', rerender);
+for (const id of ['trees', 'streetTrees', 'windows', 'roofs', 'poles', 'boards', 'stalls']) bindCheck(id, rebuildSoon);
+bindCheck('transparent', () => {}); bindCheck('credit', () => {});
+$('reroll').onclick = () => { O.seed = (O.seed || 1) + 1; saveState(); rebuild(); };
+
+
+
+/* ---------- hoe oud is welke kaart? ---------- */
+let OSM_AGE = null, IMG_DATE = null, imgReq = 0, metaBase = null;
+const fmtDate = t => new Date(t).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
+function osmAge(D) {
+  const ts = D.buildings.filter(b => !b.far && b.ts).map(b => b.ts).sort((a, b) => a - b);
+  if (!ts.length) return null;
+  const med = ts[Math.floor(ts.length / 2)], newest = ts[ts.length - 1], oldest = ts[0];
+  const recent = ts.filter(t => Date.now() - t < 2 * 365 * 864e5).length;
+  return { med, newest, oldest, n: ts.length, recent,
+    text: `Gebouwen in OpenStreetMap: de helft is voor het laatst bijgewerkt vóór ${fmtDate(med)}, de nieuwste wijziging was op ${fmtDate(newest)}.` };
+}
+async function findMetaBase() {
+  if (metaBase) return metaBase;
+  try {
+    const r = await fetch('https://metadata.maptiles.arcgis.com/arcgis/rest/services?f=json');
+    const js = await r.json();
+    const names = (js.services || []).map(x => x.name).filter(n => /^World_Imagery_Metadata_\d{4}_r\d+$/.test(n));
+    names.sort((a, b) => { const pa = a.match(/(\d{4})_r(\d+)/), pb = b.match(/(\d{4})_r(\d+)/); return (+pa[1] - +pb[1]) || (+pa[2] - +pb[2]); });
+    if (names.length) return metaBase = 'https://metadata.maptiles.arcgis.com/arcgis/rest/services/' + names[names.length - 1] + '/MapServer';
+  } catch (e) {}
+  return metaBase = 'https://metadata.maptiles.arcgis.com/arcgis/rest/services/World_Imagery_Metadata_2026_r02/MapServer';
+}
+async function fetchImageryDate(lat, lon) {
+  const my = ++imgReq;
+  try {
+    const base = await findMetaBase();
+    for (const layer of [2, 3, 4, 5, 6]) {
+      const u = `${base}/${layer}/query?geometry=${lon},${lat}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=SRC_DATE2,NICE_DESC,SRC_RES&returnGeometry=false&f=json`;
+      const js = await (await fetch(u)).json();
+      const f = js.features && js.features[0];
+      if (f && f.attributes && f.attributes.SRC_DATE2) {
+        if (my !== imgReq) return;
+        IMG_DATE = { t: f.attributes.SRC_DATE2, src: f.attributes.NICE_DESC || 'onbekend', res: f.attributes.SRC_RES };
+        showDates(); return;
+      }
+    }
+    if (my === imgReq) { IMG_DATE = { none: true }; showDates(); }
+  } catch (e) { if (my === imgReq) { IMG_DATE = { err: true }; showDates(); } }
+}
+function showDates() {
+  const el = $('dateCompare'); if (!el) return;
+  const rows = [];
+  if (IMG_DATE && IMG_DATE.t) rows.push(`<b>Satellietfoto ("Volgt camera")</b>: genomen op ${fmtDate(IMG_DATE.t)} (${IMG_DATE.src}${IMG_DATE.res ? ', ' + IMG_DATE.res + ' m per pixel' : ''}).`);
+  else if (IMG_DATE && (IMG_DATE.none || IMG_DATE.err)) rows.push('<b>Satellietfoto ("Volgt camera")</b>: datum niet beschikbaar voor deze plek.');
+  else rows.push('<b>Satellietfoto ("Volgt camera")</b>: datum opzoeken…');
+  if (OSM_AGE) rows.push(`<b>Jouw 3D-kaart (OpenStreetMap)</b>: gebouwen bijgewerkt tussen ${new Date(OSM_AGE.oldest).getFullYear()} en ${fmtDate(OSM_AGE.newest)}; de helft vóór ${fmtDate(OSM_AGE.med)}.`);
+  else rows.push('<b>Jouw 3D-kaart (OpenStreetMap)</b>: geen datums in deze data. Laad de plek opnieuw om ze op te halen.');
+  if (IMG_DATE && IMG_DATE.t && OSM_AGE) {
+    rows.push(IMG_DATE.t > OSM_AGE.med
+      ? 'De satellietfoto is <b>nieuwer</b> dan de meeste gebouwen op je 3D-kaart. Wat op de foto staat maar niet in 3D, is waarschijnlijk nooit in OpenStreetMap ingetekend.'
+      : 'De satellietfoto is <b>ouder</b> dan de meeste wijzigingen op je 3D-kaart. De 3D-kaart kan hier dus recenter zijn dan de foto.');
+  }
+  rows.push('Google Maps toont geen datum in deze weergave. Die zie je in het gratis programma Google Earth Pro, onderaan het beeld.');
+  el.innerHTML = rows.map(r => `<span>${r}</span>`).join('');
+}
+
+/* ---------- satelliet ernaast ---------- */
+let satOpen = false, satMode = 'google', esri = null, esriCam = null, esriView = null, lastGoogle = null, satTimer = null;
+function camGeo() {
+  const t = controls.target, c = camera.position;
+  const tg = unproj(t.x, t.z), cg = unproj(c.x, c.z);
+  const dx = t.x - c.x, dz = t.z - c.z, dy = t.y - c.y;
+  const heading = ((Math.atan2(dx, -dz) * 180 / Math.PI) + 360) % 360;
+  const horiz = Math.hypot(dx, dz), tilt = Math.max(0, Math.min(89, Math.atan2(horiz, -dy) * 180 / Math.PI));
+  return { tg, cg, heading, tilt, dist: c.distanceTo(t), camY: c.y };
+}
+function updateSat(force) {
+  if (!satOpen) return;
+  const g = camGeo();
+  const ll = pin ? unproj(pin.x, pin.z) : g.tg;
+  $('geLink').href = `https://earth.google.com/web/@${g.tg.lat.toFixed(6)},${g.tg.lon.toFixed(6)},0a,${Math.max(30, g.dist).toFixed(0)}d,35y,${g.heading.toFixed(1)}h,${g.tilt.toFixed(1)}t,0r`;
+  $('svLink').href = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${ll.lat.toFixed(6)},${ll.lon.toFixed(6)}&heading=${g.heading.toFixed(0)}`;
+  if (satMode === 'google') {
+    const moved = !lastGoogle || Math.hypot((g.tg.lat - lastGoogle.lat) * MLAT, (g.tg.lon - lastGoogle.lon) * mlon()) > 25;
+    if (force || moved) {
+      lastGoogle = g.tg;
+      $('gmap').src = `https://maps.google.com/maps?q=${g.tg.lat.toFixed(6)},${g.tg.lon.toFixed(6)}&t=k&z=19&output=embed`;
+    }
+  } else if (esri) {
+    esri.setView([g.tg.lat, g.tg.lon], esri.getZoom(), { animate: false });
+    esriCam.setLatLng([g.cg.lat, g.cg.lon]);
+    const h = g.heading * Math.PI / 180, len = Math.max(15, Math.min(g.dist, 250));
+    const fov = camera.fov * camera.aspect * Math.PI / 360;
+    const pt = a => { const x = camera.position.x + Math.sin(a) * len, z = camera.position.z - Math.cos(a) * len; const q = unproj(x, z); return [q.lat, q.lon]; };
+    esriView.setLatLngs([[g.cg.lat, g.cg.lon], pt(h - fov), pt(h + fov)]);
+  }
+}
+function scheduleSat() { if (!satOpen) return; clearTimeout(satTimer); satTimer = setTimeout(() => updateSat(false), satMode === 'google' ? 600 : 30); }
+function initEsri() {
+  if (esri || !window.L) return;
+  esri = L.map('esriMap', { zoomControl: true }).setView([O.lat, O.lon], 18);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 19, attribution: 'Satelliet © Esri, Maxar, Earthstar Geographics' }).addTo(esri);
+  esriView = L.polygon([[0, 0], [0, 0], [0, 0]], { color: '#ffd23f', weight: 2, fillOpacity: 0.18 }).addTo(esri);
+  esriCam = L.circleMarker([O.lat, O.lon], { radius: 6, color: '#000', weight: 2, fillColor: '#ffd23f', fillOpacity: 1 }).addTo(esri);
+}
+function setSatMode(m) {
+  satMode = m;
+  for (const b of $('segSat').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.v === m));
+  $('gmap').hidden = m !== 'google'; $('esriMap').hidden = m !== 'esri';
+  $('satNote').textContent = m === 'google'
+    ? 'Google Maps volgt het midden van je 3D-beeld (de rode markering). Draaien gaat niet in deze weergave; gebruik daarvoor Google Earth 3D.'
+    : 'Het gele vlak laat zien waar je camera staat en welke kant hij op kijkt.';
+  if (m === 'esri') { initEsri(); setTimeout(() => { esri && esri.invalidateSize(); updateSat(true); }, 50); } else updateSat(true);
+}
+$('segSat').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setSatMode(b.dataset.v); });
+$('satToggle').addEventListener('click', () => {
+  satOpen = !satOpen;
+  $('satPanel').hidden = !satOpen;
+  $('satToggle').setAttribute('aria-pressed', String(satOpen));
+  $('satToggle').textContent = satOpen ? 'Satelliet sluiten' : 'Satelliet ernaast';
+  resize();
+  if (satOpen) { setSatMode(satMode); showDates(); fetchImageryDate(O.lat, O.lon); }
+});
+controls.addEventListener('change', scheduleSat);
+
+/* ---------- start ---------- */
+initMiniMap();
+resize();
+resetCamera();
+loadArea(O.lat, O.lon, O.name);
+</script>
+</body>
+</html>

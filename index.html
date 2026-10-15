@@ -92,7 +92,7 @@ select{width:100%;border:1px solid var(--rule);background:var(--sheet);color:var
 .viewwrap{position:relative;flex:1 1 0;min-width:0;height:100%}
 .satpanel{flex:1 1 0;min-width:0;display:flex;flex-direction:column;border-left:2px solid var(--ink);background:var(--paper)}
 .sathead{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--rule)}
-.sathead .seg{flex:0 1 260px}
+.sathead .seg{flex:0 1 360px}
 .sathead a.btn{text-decoration:none;font-size:12px;padding:7px 10px}
 .satbody{position:relative;flex:1;min-height:0}
 .satbody iframe,#esriMap{position:absolute;inset:0;width:100%;height:100%;border:0}
@@ -228,13 +228,14 @@ select{width:100%;border:1px solid var(--rule);background:var(--sheet);color:var
    <section class="satpanel" id="satPanel" hidden aria-label="Satellietbeeld van dezelfde plek">
      <div class="sathead">
        <div class="seg" id="segSat" role="group" aria-label="Satellietkaart">
-         <button data-v="google" aria-pressed="true">Google Maps</button><button data-v="esri" aria-pressed="false">Volgt camera</button>
+         <button data-v="google" aria-pressed="true">Google Maps</button><button data-v="esri" aria-pressed="false">Volgt camera</button><button data-v="street" aria-pressed="false">Street View</button>
        </div>
        <a class="btn" id="geLink" href="https://earth.google.com/web/" target="_blank" rel="noopener">Google Earth 3D</a>
-       <a class="btn" id="svLink" href="https://www.google.com/maps" target="_blank" rel="noopener">Street View</a>
+       <a class="btn" id="svLink" href="https://www.google.com/maps" target="_blank" rel="noopener" hidden>Street View in nieuw tabblad</a>
      </div>
      <div class="satbody">
        <iframe id="gmap" title="Google Maps satelliet" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+       <iframe id="svmap" title="Google Street View" hidden referrerpolicy="no-referrer-when-downgrade" allow="fullscreen"></iframe>
        <div id="esriMap" hidden></div>
      </div>
      <div class="datecmp" id="dateCompare"></div>
@@ -1719,7 +1720,7 @@ function showDates() {
 }
 
 /* ---------- satelliet ernaast ---------- */
-let satOpen = false, satMode = 'google', esri = null, esriCam = null, esriView = null, lastGoogle = null, satTimer = null;
+let satOpen = false, satMode = 'google', esri = null, esriCam = null, esriView = null, lastGoogle = null, lastStreet = null, satTimer = null;
 function camGeo() {
   const t = controls.target, c = camera.position;
   const tg = unproj(t.x, t.z), cg = unproj(c.x, c.z);
@@ -1739,6 +1740,14 @@ function updateSat(force) {
     if (force || moved) {
       lastGoogle = g.tg;
       $('gmap').src = `https://maps.google.com/maps?q=${g.tg.lat.toFixed(6)},${g.tg.lon.toFixed(6)}&t=k&z=19&output=embed`;
+    }
+  } else if (satMode === 'street') {
+    const sp = pin ? unproj(pin.x, pin.z) : (g.dist < 40 ? g.cg : g.tg);
+    const moved = !lastStreet || Math.hypot((sp.lat - lastStreet.lat) * MLAT, (sp.lon - lastStreet.lon) * mlon()) > 15
+      || Math.abs(((g.heading - lastStreet.h + 540) % 360) - 180) > 25;
+    if (force || moved) {
+      lastStreet = { lat: sp.lat, lon: sp.lon, h: g.heading };
+      $('svmap').src = `https://maps.google.com/maps?layer=c&cbll=${sp.lat.toFixed(6)},${sp.lon.toFixed(6)}&cbp=11,${g.heading.toFixed(0)},0,0,0&output=svembed`;
     }
   } else if (esri) {
     esri.setView([g.tg.lat, g.tg.lon], esri.getZoom(), { animate: false });
@@ -1760,8 +1769,11 @@ function initEsri() {
 function setSatMode(m) {
   satMode = m;
   for (const b of $('segSat').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.v === m));
-  $('gmap').hidden = m !== 'google'; $('esriMap').hidden = m !== 'esri';
-  $('satNote').textContent = m === 'google'
+  $('gmap').hidden = m !== 'google'; $('esriMap').hidden = m !== 'esri'; $('svmap').hidden = m !== 'street'; $('svLink').hidden = m !== 'street';
+  if (m !== 'street') lastStreet = null;
+  $('satNote').textContent = m === 'street'
+    ? 'Street View opent bij je speld, of anders bij je camera, en kijkt dezelfde kant op. Zie je een grijs vlak, dan zijn er op deze plek geen straatfoto\'s; zet de speld op een grote weg.'
+    : m === 'google'
     ? 'Google Maps volgt het midden van je 3D-beeld (de rode markering). Draaien gaat niet in deze weergave; gebruik daarvoor Google Earth 3D.'
     : 'Het gele vlak laat zien waar je camera staat en welke kant hij op kijkt.';
   if (m === 'esri') { initEsri(); setTimeout(() => { esri && esri.invalidateSize(); updateSat(true); }, 50); } else updateSat(true);

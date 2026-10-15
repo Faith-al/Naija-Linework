@@ -110,6 +110,17 @@ select{width:100%;border:1px solid var(--rule);background:var(--sheet);color:var
   .satpanel{height:60vh;flex:none;border-left:0;border-top:2px solid var(--ink)}
 }
 
+
+.pinlist{list-style:none;margin:0;padding:0;display:grid;gap:4px;max-height:240px;overflow:auto}
+.pinlist li{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:stretch}
+.pinlist .go{min-width:0;text-align:left;border:1px solid var(--rule);background:var(--sheet);color:var(--ink);border-radius:6px;padding:6px 9px;cursor:pointer;font:500 13px var(--f-body)}
+.pinlist .go:hover{border-color:var(--ink)}
+.pinlist .go span{display:block;font:11.5px var(--f-mono);color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pinlist .go b{display:block;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pinlist .del{border:1px solid var(--rule);background:var(--sheet);color:var(--muted);border-radius:6px;padding:0 10px;cursor:pointer;font:500 12px var(--f-body);min-width:38px}
+.pinlist .del:hover{color:var(--warn);border-color:var(--warn)}
+.pinlist .del.confirm{background:var(--warn);border-color:var(--warn);color:#fff}
+.pinlist .empty{display:block;font-size:12px;color:var(--muted);padding:2px 0}
 /* inklapbaar paneel en groepen */
 .app{transition:grid-template-columns .2s ease}
 .app.panel-closed{grid-template-columns:0 1fr}
@@ -160,6 +171,16 @@ section.grp h2:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
       <div class="btnrow"><label class="btn" for="osmFile" tabindex="0">Kaartbestand laden (.osm)</label>
         <input type="file" id="osmFile" accept=".osm,.xml,.json,text/xml,application/json" hidden></div>
       <p class="note">Laadt de kaart niet? Ga naar openstreetmap.org, zoom in op je plek, klik op <b>Exporteren</b> en dan op de blauwe knop. Laad het bestand <i>map.osm</i> hier.</p>
+    </section>
+
+    <section class="grp" aria-labelledby="h-pins">
+      <h2 id="h-pins">Opgeslagen plekken</h2>
+      <form class="search" id="pinForm">
+        <input id="pinName" type="text" maxlength="60" placeholder="Naam, bijv. Hoek Balogun Street" aria-label="Naam voor deze plek">
+        <button class="btn" type="submit">Opslaan</button>
+      </form>
+      <ul id="pinList" class="pinlist"></ul>
+      <p class="note">Slaat de plek, de breedte, je speld en je camerastand op. Ze blijven in deze browser bewaard.</p>
     </section>
 
     <section class="grp" aria-labelledby="h-gebied">
@@ -1889,6 +1910,68 @@ $('satToggle').addEventListener('click', () => {
 controls.addEventListener('change', scheduleSat);
 
 
+
+/* ---------- opgeslagen plekken ---------- */
+let SAVED = [], pinLayer = null;
+try { SAVED = JSON.parse(localStorage.getItem('naija-lijnwerk-pins') || '[]') || []; } catch (e) { SAVED = []; }
+const storePins = () => { try { localStorage.setItem('naija-lijnwerk-pins', JSON.stringify(SAVED)); } catch (e) {} };
+function savePlace(name) {
+  const at = pin ? unproj(pin.x, pin.z) : unproj(controls.target.x, controls.target.z);
+  const item = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    name: name || (O.name ? O.name.split(',')[0] : `${at.lat.toFixed(4)}, ${at.lon.toFixed(4)}`),
+    lat: O.lat, lon: O.lon, size: O.size, at: { lat: at.lat, lon: at.lon },
+    pin: pin ? { x: pin.x, z: pin.z } : null,
+    cam: { p: camera.position.toArray(), t: controls.target.toArray() },
+    look: lookMode, lens: O.lens, t: Date.now()
+  };
+  SAVED.unshift(item); storePins(); renderPins();
+  status('Plek opgeslagen.', item.name); statusFade(2200);
+}
+async function goPlace(item) {
+  O.size = item.size;
+  for (const b of $('segSize').querySelectorAll('button')) b.setAttribute('aria-pressed', String(+b.dataset.v === O.size));
+  if (item.lens) { O.lens = item.lens; $('lens').value = O.lens; $('lens').parentElement.querySelector('output').textContent = Math.round(O.lens) + ' mm'; }
+  saveState();
+  await loadArea(item.lat, item.lon, item.name);
+  if (Math.abs(ORIGIN.lat - item.lat) > 1e-9 || Math.abs(ORIGIN.lon - item.lon) > 1e-9) return;
+  if (lookMode) setLook(false);
+  camera.position.fromArray(item.cam.p); controls.target.fromArray(item.cam.t);
+  if (item.pin) { pin = { x: item.pin.x, z: item.pin.z }; pinMesh.position.set(pin.x, 2.2, pin.z); }
+  controls.update();
+  if (item.look) setLook(true);
+  requestRender(); if (typeof updateSat === 'function') updateSat(true);
+}
+function deletePlace(id) { SAVED = SAVED.filter(x => x.id !== id); storePins(); renderPins(); }
+function renderPins() {
+  const ul = $('pinList'); ul.innerHTML = '';
+  if (!SAVED.length) {
+    const li = document.createElement('li'); li.innerHTML = '<span class="empty">Nog geen plekken opgeslagen. Zet een speld, geef hem een naam en klik op Opslaan.</span>'; ul.append(li);
+  }
+  for (const item of SAVED) {
+    const li = document.createElement('li');
+    const go = document.createElement('button'); go.type = 'button'; go.className = 'go';
+    const b = document.createElement('b'); b.textContent = item.name;
+    const sp = document.createElement('span'); sp.textContent = `${item.at.lat.toFixed(4)}, ${item.at.lon.toFixed(4)} · ${item.size >= 1000 ? (item.size / 1000).toLocaleString('nl-NL') + ' km' : item.size + ' m'}`;
+    go.append(b, sp); go.title = 'Ga naar ' + item.name; go.onclick = () => goPlace(item);
+    const del = document.createElement('button'); del.type = 'button'; del.className = 'del'; del.textContent = '✕';
+    del.setAttribute('aria-label', 'Verwijder ' + item.name); del.title = 'Verwijderen';
+    let armed = null;
+    del.onclick = () => {
+      if (armed) { clearTimeout(armed); deletePlace(item.id); return; }
+      del.classList.add('confirm'); del.textContent = 'Wis?';
+      armed = setTimeout(() => { armed = null; del.classList.remove('confirm'); del.textContent = '✕'; }, 3000);
+    };
+    li.append(go, del); ul.append(li);
+  }
+  if (mini && window.L) {
+    if (pinLayer) pinLayer.remove();
+    pinLayer = L.layerGroup(SAVED.map(item => L.circleMarker([item.at.lat, item.at.lon], { radius: 5, color: '#141514', weight: 1.5, fillColor: '#d2452a', fillOpacity: 1 })
+      .bindTooltip(item.name).on('click', () => goPlace(item)))).addTo(mini);
+  }
+}
+$('pinForm').addEventListener('submit', e => { e.preventDefault(); savePlace($('pinName').value.trim()); $('pinName').value = ''; });
+
 /* ---------- inklappen ---------- */
 let FOLD = {};
 try { FOLD = JSON.parse(localStorage.getItem('naija-lijnwerk-fold') || '{}') || {}; } catch (e) {}
@@ -1914,6 +1997,7 @@ if (FOLD.panel) setPanel(false);
 /* ---------- start ---------- */
 setLook(false);
 initMiniMap();
+renderPins();
 resize();
 resetCamera();
 loadArea(O.lat, O.lon, O.name);

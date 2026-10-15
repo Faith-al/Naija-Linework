@@ -78,6 +78,7 @@ select{width:100%;border:1px solid var(--rule);background:var(--sheet);color:var
 #status .sub{display:block;color:var(--muted);font-size:12px;margin-top:2px}
 .hud{position:absolute;right:16px;bottom:16px;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .hud .btn{box-shadow:2px 2px 0 var(--ink)}
+.hud .btn[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
 .keys{position:absolute;left:16px;bottom:16px;font:11.5px var(--f-mono);color:#555;background:rgba(255,255,255,.85);padding:6px 8px;border-radius:4px;line-height:1.6}
 .keys b{font-weight:500;color:#111}
 
@@ -217,10 +218,11 @@ select{width:100%;border:1px solid var(--rule);background:var(--sheet);color:var
    <div class="viewwrap" id="viewWrap">
     <canvas id="view"></canvas>
     <div id="status" role="status">Laden…</div>
-    <div class="keys"><b>Sleep</b> draaien · <b>Rechts</b> schuiven · <b>Scroll</b> zoomen · <b>WASD</b> lopen · <b>Q/E</b> omhoog/omlaag · <b>Klik</b> speld · <b>F</b> naar speld</div>
+    <div class="keys" id="keysHelp"></div>
     <div class="hud">
       <button class="btn" id="toPin" type="button">Camera naar speld</button>
       <button class="btn" id="eye" type="button">Op ooghoogte</button>
+      <button class="btn" id="lookBtn" type="button" aria-pressed="false">Rondkijken</button>
       <button class="btn" id="aerial" type="button">Vogelvlucht</button>
       <button class="btn primary" id="satToggle" type="button" aria-pressed="false">Satelliet ernaast</button>
     </div>
@@ -1460,19 +1462,70 @@ function resetCamera() {
   controls.update(); requestRender();
 }
 controls.addEventListener('change', requestRender);
+/* rondkijken: blijf staan en draai om je eigen as */
+let lookMode = false, lookDrag = null;
+const LOOK_DIST = 10;
+function lookAngles() {
+  const d = new THREE.Vector3(); camera.getWorldDirection(d);
+  return { yaw: Math.atan2(d.x, -d.z), pitch: Math.asin(Math.max(-1, Math.min(1, d.y))) };
+}
+function applyLook(yaw, pitch) {
+  pitch = Math.max(-1.45, Math.min(1.45, pitch));
+  const d = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
+  controls.target.copy(camera.position).addScaledVector(d, LOOK_DIST);
+  controls.update(); requestRender();
+}
+function setLook(on) {
+  lookMode = on;
+  controls.enableRotate = !on; controls.enableZoom = !on;
+  controls.maxPolarAngle = on ? Math.PI - 0.02 : Math.PI * 0.62;
+  $('lookBtn').setAttribute('aria-pressed', String(on));
+  if (on) { const a = lookAngles(); applyLook(a.yaw, a.pitch); }
+  else {
+    /* terug naar draaien rond een punt: zet het draaipunt op de grond vóór je */
+    const d = new THREE.Vector3(); camera.getWorldDirection(d);
+    const t = d.y < -0.05 ? Math.min(camera.position.y / -d.y, 400) : 40;
+    controls.target.copy(camera.position).addScaledVector(d, t); if (controls.target.y < 0) controls.target.y = 0;
+    controls.update(); requestRender();
+  }
+  $('keysHelp').innerHTML = on
+    ? '<b>Sleep</b> rondkijken · <b>←/→</b> draaien · <b>Scroll</b> of <b>W/S</b> lopen · <b>A/D</b> opzij · <b>Q/E</b> omhoog/omlaag · <b>Shift</b> sneller'
+    : '<b>Sleep</b> draaien · <b>Rechts</b> schuiven · <b>Scroll</b> zoomen · <b>WASD</b> lopen · <b>Q/E</b> omhoog/omlaag · <b>Klik</b> speld · <b>F</b> naar speld';
+}
+$('lookBtn').onclick = () => setLook(!lookMode);
+canvas.addEventListener('pointerdown', e => {
+  if (!lookMode || e.button !== 0) return;
+  const a = lookAngles(); lookDrag = { x: e.clientX, y: e.clientY, yaw: a.yaw, pitch: a.pitch };
+});
+window.addEventListener('pointermove', e => {
+  if (!lookMode || !lookDrag) return;
+  const k = camera.fov * Math.PI / 180 / canvas.clientHeight;   /* 1 pixel slepen = 1 pixel draaien */
+  applyLook(lookDrag.yaw - (e.clientX - lookDrag.x) * k, lookDrag.pitch + (e.clientY - lookDrag.y) * k);
+});
+window.addEventListener('pointerup', () => { lookDrag = null; });
+canvas.addEventListener('wheel', e => {
+  if (!lookMode) return;
+  e.preventDefault();
+  const f = new THREE.Vector3(); camera.getWorldDirection(f); f.y = 0; f.normalize();
+  const step = (e.shiftKey ? 8 : 2) * -Math.sign(e.deltaY);
+  camera.position.addScaledVector(f, step); controls.target.addScaledVector(f, step);
+  controls.update(); requestRender();
+}, { passive: false });
 function eyeLevel() {
   const p = pin ? new THREE.Vector3(pin.x, 0, pin.z) : controls.target.clone();
   const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y = 0; if (dir.lengthSq() < 1e-6) dir.set(0, 0, -1); dir.normalize();
   camera.position.set(p.x, 1.6, p.z);
   controls.target.set(p.x + dir.x * 25, 5, p.z + dir.z * 25);
   controls.update(); requestRender();
+  setLook(true);
 }
 function toPin() {
+  if (lookMode) setLook(false);
   if (!pin) { status('Klik eerst in de 3D-weergave of op de kaart om een speld te zetten.'); statusFade(2600); return; }
   const off = camera.position.clone().sub(controls.target);
   controls.target.set(pin.x, 0, pin.z); camera.position.copy(controls.target).add(off); controls.update(); requestRender();
 }
-$('eye').onclick = eyeLevel; $('toPin').onclick = toPin; $('aerial').onclick = resetCamera;
+$('eye').onclick = eyeLevel; $('toPin').onclick = toPin; $('aerial').onclick = () => { if (lookMode) setLook(false); resetCamera(); };
 
 let downAt = null;
 canvas.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
@@ -1486,24 +1539,31 @@ canvas.addEventListener('pointerup', e => {
     pin = { x: hit.x, z: hit.z }; pinMesh.position.set(hit.x, 2.2, hit.z); requestRender(); updateSat(false);
   }
 });
-const keys = new Set();
+const keys = new Set(); let fast = false;
 window.addEventListener('keydown', e => {
   if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName)) return;
-  const k = e.key.toLowerCase();
+  const k = e.key.toLowerCase(); fast = e.shiftKey;
   if (k === 'f') { toPin(); return; }
   if ('wasdqe'.includes(k) || k.startsWith('arrow')) { keys.add(k); if (keys.size === 1) moveLoop(); e.preventDefault(); }
 });
-window.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+window.addEventListener('keyup', e => { keys.delete(e.key.toLowerCase()); fast = e.shiftKey; });
 window.addEventListener('blur', () => keys.clear());
 function moveLoop() {
   if (!keys.size) return;
-  const dist = camera.position.distanceTo(controls.target), sp = Math.max(0.4, Math.min(dist * 0.02, 12));
+  const dist = camera.position.distanceTo(controls.target);
+  let sp = lookMode ? Math.max(0.25, camera.position.y * 0.08) : Math.max(0.4, Math.min(dist * 0.02, 12));
+  if (fast) sp *= 4;
+  if (lookMode && (keys.has('arrowleft') || keys.has('arrowright'))) {
+    const a = lookAngles(), turn = (fast ? 0.06 : 0.025) * (keys.has('arrowleft') ? -1 : 1);
+    camera.position.y = Math.max(camera.position.y, 0.6);
+    applyLook(a.yaw + turn, a.pitch);
+  }
   const f = new THREE.Vector3(); camera.getWorldDirection(f); f.y = 0; f.normalize();
   const r = new THREE.Vector3(-f.z, 0, f.x), mv = new THREE.Vector3();
   if (keys.has('w') || keys.has('arrowup')) mv.add(f);
   if (keys.has('s') || keys.has('arrowdown')) mv.sub(f);
-  if (keys.has('d') || keys.has('arrowright')) mv.add(r);
-  if (keys.has('a') || keys.has('arrowleft')) mv.sub(r);
+  if (keys.has('d') || (!lookMode && keys.has('arrowright'))) mv.add(r);
+  if (keys.has('a') || (!lookMode && keys.has('arrowleft'))) mv.sub(r);
   mv.multiplyScalar(sp);
   if (keys.has('q')) mv.y += sp * 0.6;
   if (keys.has('e')) mv.y -= sp * 0.6;
@@ -1790,6 +1850,7 @@ $('satToggle').addEventListener('click', () => {
 controls.addEventListener('change', scheduleSat);
 
 /* ---------- start ---------- */
+setLook(false);
 initMiniMap();
 resize();
 resetCamera();

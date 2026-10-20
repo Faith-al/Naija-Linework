@@ -228,6 +228,7 @@ section.grp h2:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
         <label><input type="checkbox" id="poles">Palen en draden</label>
         <label><input type="checkbox" id="boards">Reclameborden</label>
         <label><input type="checkbox" id="stalls">Marktkraampjes</label>
+        <label><input type="checkbox" id="tanks">Watertanks</label>
       </div>
       <div class="seglbl">Bomen tekenen
         <div class="seg" id="segTreeStyle" role="group" aria-label="Boomstijl">
@@ -315,7 +316,7 @@ const DEFAULTS = {
   lat: 6.4549, lon: 3.3893, name: 'Lagos – Balogun Market',
   size: 400, far: 0, tone: 'tone', lineW: 1.0, outline: 1.6, cell: 6,
   sunAz: 230, sunEl: 50, lens: 24, shadows: true, vertical: false,
-  trees: true, streetTrees: true, windows: true, roofs: true, poles: true, boards: true, stalls: true,
+  trees: true, streetTrees: true, windows: true, roofs: true, poles: true, boards: true, stalls: true, tanks: true,
   treeStyle: 'tone', crowd: 0.4, exportSize: 3600, transparent: false, credit: true, seed: 1
 };
 let O = Object.assign({}, DEFAULTS);
@@ -893,10 +894,10 @@ function buildBuildings(D, G, gbs, rndBase) {
         /* borstwering + watertank (veel op Nigeriaanse daken) */
         addParapet(gbs.plain, outer, hi.h, col);
         gbs.plain.tint = null;
-        if (r() < 0.45) {
+        const tankRoll = r();
+        if (O.tanks && tankRoll < 0.45) {
           let cx = 0, cz = 0; for (const p of outer) { cx += p[0]; cz += p[1]; } cx /= outer.length; cz /= outer.length;
-          if (pip([cx, cz], outer)) addPrim(gbs.plain, PRIM.cyl8, M(cx, hi.h + 1.6 + 0.65, cz, 0.75, 1.3, 0.75), 0.55, TAG.prop),
-            addPrim(gbs.plain, PRIM.box, M(cx, hi.h + 0.8, cz, 1.6, 1.6, 1.6), 0.9, TAG.prop);
+          if (pip([cx, cz], outer)) waterTanks(gbs.plain, cx, hi.h, cz, r, (ob || OBB(outer) || { ang: 0 }).ang);
         }
       }
     }
@@ -909,6 +910,39 @@ function buildBuildings(D, G, gbs, rndBase) {
     n++;
   }
   return { n, nGuess };
+}
+
+/* watertanks op platte daken: plastic tank op een betonnen of metalen onderstel */
+const TANKS = [ /* [grijswaarde voor lijnwerk, echte kleur] */
+  [0.14, [0.11, 0.11, 0.12]],   /* zwart, het meest gezien */
+  [0.14, [0.11, 0.11, 0.12]],
+  [0.30, [0.16, 0.27, 0.52]],   /* donkerblauw */
+  [0.72, [0.90, 0.74, 0.16]],   /* geel */
+  [0.95, [0.92, 0.92, 0.90]],   /* wit */
+];
+function waterTanks(gb, x, roofY, z, r, ang) {
+  const metal = r() < 0.5, standH = metal ? 1.4 + r() * 1.2 : 0.9 + r() * 0.5;
+  const n = r() < 0.25 ? 2 : 1, rad = 0.62 + r() * 0.12, th = 1.5 + r() * 0.3;
+  const c = Math.cos(ang), sn = Math.sin(ang), w = n === 2 ? 3.2 : 1.7, d = 1.7;
+  const P = (u, v) => [x + u * c - v * sn, z + u * sn + v * c];
+  gb.tint = [0.72 / 0.62, 0.71 / 0.62, 0.68 / 0.62];             /* grijs onderstel */
+  if (metal) {
+    for (const u of [-w / 2 + 0.08, w / 2 - 0.08]) for (const v of [-d / 2 + 0.08, d / 2 - 0.08]) {
+      const q = P(u, v); addPrim(gb, PRIM.box, M(q[0], roofY + standH / 2, q[1], 0.1, standH, 0.1, 0, -ang, 0), 0.62, TAG.prop);
+    }
+    const q = P(0, 0); addPrim(gb, PRIM.box, M(q[0], roofY + standH - 0.06, q[1], w, 0.12, d, 0, -ang, 0), 0.62, TAG.prop);
+  } else {
+    const q = P(0, 0); addPrim(gb, PRIM.box, M(q[0], roofY + standH / 2, q[1], w, standH, d, 0, -ang, 0), 0.62, TAG.prop);
+  }
+  for (let i = 0; i < n; i++) {
+    const t = TANKS[Math.floor(r() * TANKS.length)], g = t[0], col = t[1];
+    const q = P(n === 2 ? (i ? 0.78 : -0.78) : 0, 0);
+    gb.tint = [col[0] / g, col[1] / g, col[2] / g];
+    addPrim(gb, PRIM.cyl8, M(q[0], roofY + standH + th / 2, q[1], rad, th, rad), g, TAG.prop);
+    addPrim(gb, PRIM.cylT, M(q[0], roofY + standH + th + 0.09, q[1], rad * 0.92, 0.18, rad * 0.92), g, TAG.prop);
+    addPrim(gb, PRIM.cyl8, M(q[0], roofY + standH + th + 0.24, q[1], 0.22, 0.14, 0.22), g, TAG.prop);
+  }
+  gb.tint = null;
 }
 function addParapet(gb, ring, h, col) {
   const A = area2(ring), sgn = A > 0 ? 1 : -1, th = 0.22, ph = 0.9;
@@ -1849,7 +1883,7 @@ bindRange('sunAz', v => Math.round(v) + '°', resun);
 bindRange('sunEl', v => Math.round(v) + '°', resun);
 bindRange('lens', v => Math.round(v) + ' mm', rerender);
 bindCheck('shadows', resun); bindCheck('vertical', rerender);
-for (const id of ['trees', 'streetTrees', 'windows', 'roofs', 'poles', 'boards', 'stalls']) bindCheck(id, rebuildSoon);
+for (const id of ['trees', 'streetTrees', 'windows', 'roofs', 'poles', 'boards', 'stalls', 'tanks']) bindCheck(id, rebuildSoon);
 bindCheck('transparent', () => {}); bindCheck('credit', () => {});
 $('reroll').onclick = () => { O.seed = (O.seed || 1) + 1; saveState(); rebuild(); };
 
